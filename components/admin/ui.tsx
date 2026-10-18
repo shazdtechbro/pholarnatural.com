@@ -55,6 +55,9 @@ export function StatCard({
 }
 
 const STATUS_TONE: Record<string, string> = {
+  refunded: 'bg-primary/10 text-primary',
+  refund_pending: 'bg-secondary-container text-on-secondary-container',
+  paid: 'bg-primary/10 text-primary',
   confirmed: 'bg-primary/10 text-primary',
   processing: 'bg-secondary-container text-on-secondary-container',
   shipped: 'bg-secondary-container text-on-secondary-container',
@@ -69,10 +72,13 @@ const STATUS_TONE: Record<string, string> = {
 
 /** Status pill. Carries its own text, never colour alone (doc §1.1.5). */
 export function StatusBadge({ status }: { status: string }) {
-  const tone = STATUS_TONE[status.toLowerCase()] ?? 'bg-surface-container-highest text-on-surface-variant'
+  const tone =
+    STATUS_TONE[status.toLowerCase()] ?? 'bg-surface-container-highest text-on-surface-variant'
   return (
-    <span className={`inline-block whitespace-nowrap rounded-full px-3 py-1 font-label-sm text-[11px] font-bold uppercase ${tone}`}>
-      {status}
+    <span
+      className={`inline-block whitespace-nowrap rounded-full px-3 py-1 font-label-sm text-[11px] font-bold uppercase ${tone}`}
+    >
+      {status.replaceAll('_', ' ')}
     </span>
   )
 }
@@ -80,7 +86,7 @@ export function StatusBadge({ status }: { status: string }) {
 /** Scroll container for wide tables — the page body must never scroll sideways. */
 export function TableWrap({ children, caption }: { children: ReactNode; caption: string }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-lowest">
+    <div className="relative overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-lowest">
       <table className="w-full min-w-[44rem] border-collapse text-left">
         <caption className="sr-only-live">{caption}</caption>
         {children}
@@ -102,7 +108,9 @@ export function Th({ children, className = '' }: { children: ReactNode; classNam
 
 export function Td({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <td className={`border-b border-outline-variant/60 p-4 font-body-md text-body-md text-on-surface-variant ${className}`}>
+    <td
+      className={`border-b border-outline-variant/60 p-4 font-body-md text-body-md text-on-surface-variant ${className}`}
+    >
       {children}
     </td>
   )
@@ -278,7 +286,15 @@ export function AdminButton({
 }
 
 /** Shown when a table has no rows — a blank table reads as a broken page (doc §1.1.4). */
-export function EmptyState({ icon: Icon, title, message }: { icon: LucideIcon; title: string; message: string }) {
+export function EmptyState({
+  icon: Icon,
+  title,
+  message,
+}: {
+  icon: LucideIcon
+  title: string
+  message: string
+}) {
   return (
     <div className="rounded-2xl border border-dashed border-outline-variant py-16 text-center">
       <Icon className="mx-auto mb-4 h-10 w-10 text-outline" aria-hidden="true" />

@@ -1,6 +1,8 @@
 'use client'
 
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { useReducedMotion } from '@/lib/use-reduced-motion'
+
+import { AnimatePresence, motion } from 'motion/react'
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react'
 import { useToast, type ToastVariant } from '@/context/ToastContext'
 

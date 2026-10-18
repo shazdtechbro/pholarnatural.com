@@ -20,22 +20,29 @@ def get_dashboard_stats(db: Session) -> dict:
 
     revenue_today_cents: int = (
         db.query(func.sum(Order.total_cents))
-        .filter(func.date(Order.created_at) == today, Order.status != "cancelled")
+        .filter(
+            func.date(Order.created_at) == today,
+            Order.status.in_(
+                ["paid", "confirmed", "processing", "shipped", "delivered"]
+            ),
+        )
         .scalar()
         or 0
     )
 
     revenue_total_cents: int = (
         db.query(func.sum(Order.total_cents))
-        .filter(Order.status != "cancelled")
+        .filter(
+            Order.status.in_(
+                ["paid", "confirmed", "processing", "shipped", "delivered"]
+            )
+        )
         .scalar()
         or 0
     )
 
     bookings_today: int = (
-        db.query(func.count(Booking.id))
-        .filter(Booking.booking_date == today)
-        .scalar()
+        db.query(func.count(Booking.id)).filter(Booking.booking_date == today).scalar()
         or 0
     )
 

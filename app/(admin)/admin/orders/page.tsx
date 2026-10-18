@@ -18,10 +18,20 @@ import { formatPrice, formatDateShort, formatDateLong } from '@/lib/format'
 
 /** The fulfilment pipeline, in order (doc §1.14.5). */
 const STATUS_FLOW = ['paid', 'confirmed', 'processing', 'shipped', 'delivered'] as const
-type PipelineStatus = (typeof STATUS_FLOW)[number]
-type Filter = 'all' | PipelineStatus | 'cancelled' | 'pending'
+type Filter = string
 
-const ALL_STATUSES = ['pending', 'paid', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'] as const
+const availableStatuses = (status: string) => [
+  status,
+  ...((
+    {
+      pending: ['cancelled'],
+      paid: ['confirmed', 'processing', 'cancelled'],
+      confirmed: ['processing', 'cancelled'],
+      processing: ['shipped', 'cancelled'],
+      shipped: ['delivered'],
+    } as Record<string, string[]>
+  )[status] ?? []),
+]
 
 /** Order management (doc §1.14.5). */
 export default function AdminOrdersPage() {
@@ -49,12 +59,17 @@ export default function AdminOrdersPage() {
 
   async function setStatus(order: AdminOrder, newStatus: string) {
     if (newStatus === order.status) return
+    if (
+      newStatus === 'cancelled' &&
+      !window.confirm('Cancel this order? Any captured payment will be refunded.')
+    )
+      return
     setUpdating(order.id)
     try {
-      await updateOrderStatus(order.id, newStatus)
-      setOrders((os) => os.map((o) => (o.id === order.id ? { ...o, status: newStatus } : o)))
-      setViewing((v) => (v?.id === order.id ? { ...v, status: newStatus } : v))
-      toast(`${order.order_number} → ${newStatus}`)
+      const response = await updateOrderStatus(order.id, newStatus)
+      setOrders((os) => os.map((o) => (o.id === order.id ? { ...o, status: response.status } : o)))
+      setViewing((v) => (v?.id === order.id ? { ...v, status: response.status } : v))
+      toast(`${order.order_number} → ${response.status}`)
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Update failed', 'error')
     } finally {
@@ -62,7 +77,15 @@ export default function AdminOrdersPage() {
     }
   }
 
-  const filterOptions: Filter[] = ['all', 'pending', ...STATUS_FLOW, 'cancelled']
+  const filterOptions: Filter[] = [
+    'all',
+    'pending',
+    ...STATUS_FLOW,
+    'cancelled',
+    'refund_pending',
+    'refunded',
+    'expired',
+  ]
 
   return (
     <>
@@ -125,8 +148,10 @@ export default function AdminOrdersPage() {
                     aria-label={`Status for order ${o.order_number}`}
                     className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1.5 font-label-sm text-[13px] capitalize text-on-surface focus:border-primary focus:outline-none disabled:opacity-50"
                   >
-                    {ALL_STATUSES.map((s) => (
-                      <option key={s} value={s}>{s}</option>
+                    {availableStatuses(o.status).map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
                     ))}
                   </select>
                 </Td>
@@ -170,6 +195,9 @@ function OrderModal({
   updating: boolean
 }) {
   const [selectedStatus, setSelectedStatus] = useState(order.status)
+  const chosenStatus = availableStatuses(order.status).includes(selectedStatus)
+    ? selectedStatus
+    : order.status
   const addr = order.shipping_address
 
   return (
@@ -183,7 +211,9 @@ function OrderModal({
         </div>
 
         <section>
-          <h3 className="mb-3 font-label-sm text-label-sm font-bold uppercase text-primary">Items</h3>
+          <h3 className="mb-3 font-label-sm text-label-sm font-bold uppercase text-primary">
+            Items
+          </h3>
           <ul className="divide-y divide-outline-variant">
             {order.items.map((item) => (
               <li key={item.id} className="flex items-center justify-between gap-4 py-3">
@@ -220,7 +250,9 @@ function OrderModal({
           </div>
 
           <div>
-            <h3 className="mb-3 font-label-sm text-label-sm font-bold uppercase text-primary">Payment</h3>
+            <h3 className="mb-3 font-label-sm text-label-sm font-bold uppercase text-primary">
+              Payment
+            </h3>
             <dl className="space-y-2 font-body-md text-body-md">
               <div className="flex justify-between">
                 <dt className="text-on-surface-variant">Subtotal</dt>
@@ -238,6 +270,10 @@ function OrderModal({
                   {order.shipping_cents === 0 ? 'Free' : formatPrice(order.shipping_cents)}
                 </dd>
               </div>
+              <div className="flex justify-between">
+                <dt>Tax</dt>
+                <dd>{formatPrice(order.tax_cents ?? 0)}</dd>
+              </div>
               <div className="flex justify-between border-t border-outline-variant pt-2 font-semibold">
                 <dt className="text-primary">Total</dt>
                 <dd className="text-primary">{formatPrice(order.total_cents)}</dd>
@@ -253,25 +289,28 @@ function OrderModal({
           </h3>
           <div className="flex flex-wrap items-center gap-3">
             <select
-              value={selectedStatus}
+              value={chosenStatus}
               disabled={updating}
               onChange={(e) => setSelectedStatus(e.target.value)}
               className="flex-1 rounded-xl border border-outline bg-surface-container-lowest px-4 py-3 font-body-md text-body-md capitalize text-on-surface focus:border-primary focus:outline-none disabled:opacity-50"
             >
-              {ALL_STATUSES.map((s) => (
-                <option key={s} value={s}>{s}</option>
+              {availableStatuses(order.status).map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
               ))}
             </select>
             <AdminButton
-              onClick={() => onSetStatus(selectedStatus)}
-              disabled={updating || selectedStatus === order.status}
+              onClick={() => onSetStatus(chosenStatus)}
+              disabled={updating || chosenStatus === order.status}
               className="shrink-0"
             >
               {updating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : 'Save'}
             </AdminButton>
           </div>
           <p className="mt-2 font-body-md text-[12px] text-on-surface-variant">
-            Changing to <strong>confirmed</strong>, <strong>processing</strong>, <strong>shipped</strong>, or <strong>delivered</strong> sends the customer an email.
+            Changing to <strong>confirmed</strong>, <strong>processing</strong>,{' '}
+            <strong>shipped</strong>, or <strong>delivered</strong> sends the customer an email.
           </p>
         </section>
       </div>

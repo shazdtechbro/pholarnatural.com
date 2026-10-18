@@ -1,3 +1,4 @@
+import { serializeJsonLd } from '@/lib/json-ld'
 import type { Metadata } from 'next'
 import Hero from '@/components/Hero'
 import Products from '@/components/Products'
@@ -28,7 +29,7 @@ export default function Home() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+          __html: serializeJsonLd({
             '@context': 'https://schema.org',
             '@type': 'HealthAndBeautyBusiness',
             name: BUSINESS.name,

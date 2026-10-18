@@ -1,6 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import EmailStatus from '@/components/admin/EmailStatus'
+import PasswordChange from '@/components/admin/PasswordChange'
 import {
   Save,
   Send,
@@ -126,7 +128,7 @@ function WhatsAppConnectionPanel() {
       mounted = false
       clearInterval(id)
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   async function disconnect() {
     setDisconnecting(true)
@@ -185,8 +187,7 @@ function WhatsAppConnectionPanel() {
         <div className="space-y-4">
           {status?.phone && (
             <p className="font-body-md text-body-md text-on-surface-variant">
-              Linked number:{' '}
-              <span className="font-semibold text-on-surface">+{status.phone}</span>
+              Linked number: <span className="font-semibold text-on-surface">+{status.phone}</span>
             </p>
           )}
           <p className="font-body-md text-body-md text-on-surface-variant">
@@ -220,7 +221,10 @@ function WhatsAppConnectionPanel() {
             aria-label="QR code"
           >
             {qrLoading && (
-              <Loader2 className="h-10 w-10 animate-spin text-primary" aria-label="Loading QR code" />
+              <Loader2
+                className="h-10 w-10 animate-spin text-primary"
+                aria-label="Loading QR code"
+              />
             )}
             {!qrLoading && qrData && (
               /* base64 comes from backend as a full data URI */
@@ -241,8 +245,8 @@ function WhatsAppConnectionPanel() {
           </div>
 
           <p className="font-body-md text-[12px] text-on-surface-variant">
-            QR codes expire after ~30 seconds. The panel will update automatically once
-            your phone confirms the link.
+            QR codes expire after ~30 seconds. The panel will update automatically once your phone
+            confirms the link.
           </p>
 
           <AdminButton variant="secondary" onClick={refreshQR} disabled={qrLoading} type="button">
@@ -268,18 +272,48 @@ const NOTIFICATION_EVENTS: {
   Icon: LucideIcon
   note?: string
 }[] = [
-  { key: 'notify_new_order', label: 'New order', description: 'Customer places a shop order', Icon: ShoppingBag },
-  { key: 'notify_new_booking', label: 'New booking', description: 'Customer books a service appointment', Icon: CalendarDays },
-  { key: 'notify_booking_cancelled', label: 'Booking cancelled', description: 'Customer or admin cancels an appointment', Icon: CalendarX },
-  { key: 'notify_new_contact_message', label: 'New contact message', description: 'Customer submits the contact form', Icon: MessageSquare },
-  { key: 'notify_low_stock', label: 'Low stock', description: 'A product variant drops below the threshold', Icon: PackageOpen },
-  { key: 'notify_discount_maxed_out', label: 'Discount maxed out', description: 'A promo code reaches its usage limit', Icon: TicketPercent },
+  {
+    key: 'notify_new_order',
+    label: 'New order',
+    description: 'Customer places a shop order',
+    Icon: ShoppingBag,
+  },
+  {
+    key: 'notify_new_booking',
+    label: 'New booking',
+    description: 'Customer books a service appointment',
+    Icon: CalendarDays,
+  },
+  {
+    key: 'notify_booking_cancelled',
+    label: 'Booking cancelled',
+    description: 'Customer or admin cancels an appointment',
+    Icon: CalendarX,
+  },
+  {
+    key: 'notify_new_contact_message',
+    label: 'New contact message',
+    description: 'Customer submits the contact form',
+    Icon: MessageSquare,
+  },
+  {
+    key: 'notify_low_stock',
+    label: 'Low stock',
+    description: 'A product variant drops below the threshold',
+    Icon: PackageOpen,
+  },
+  {
+    key: 'notify_discount_maxed_out',
+    label: 'Discount maxed out',
+    description: 'A promo code reaches its usage limit',
+    Icon: TicketPercent,
+  },
   {
     key: 'notify_payment_failed',
     label: 'Payment failed',
-    description: 'Stripe reports a payment failure (Phase 9)',
+    description: "A customer's payment could not be completed",
     Icon: CreditCard,
-    note: 'Enable once Stripe is connected in Phase 9. Default stays OFF until then.',
+    note: 'Alerts are enabled by default and can be turned off here.',
   },
 ]
 
@@ -319,9 +353,12 @@ export default function AdminSettingsPage() {
       .finally(() => setLoading(false))
   }, [toast])
 
-  const set = useCallback(<K extends keyof AdminSettingsData>(key: K, value: AdminSettingsData[K]) => {
-    setSettings((s) => (s ? { ...s, [key]: value } : s))
-  }, [])
+  const set = useCallback(
+    <K extends keyof AdminSettingsData>(key: K, value: AdminSettingsData[K]) => {
+      setSettings((s) => (s ? { ...s, [key]: value } : s))
+    },
+    [],
+  )
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
@@ -352,7 +389,10 @@ export default function AdminSettingsPage() {
   if (loading || !settings) {
     return (
       <>
-        <PageHeader title="Settings" description="Notifications, WhatsApp connection, and business config." />
+        <PageHeader
+          title="Settings"
+          description="Notifications, WhatsApp connection, and business config."
+        />
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-primary" aria-label="Loading settings" />
         </div>
@@ -362,7 +402,10 @@ export default function AdminSettingsPage() {
 
   return (
     <>
-      <PageHeader title="Settings" description="Notifications, WhatsApp connection, and business config." />
+      <PageHeader
+        title="Settings"
+        description="Notifications, WhatsApp connection, and business config."
+      />
 
       <div className="max-w-2xl space-y-6">
         {/* WhatsApp connection — link/unlink, QR code, status */}
@@ -376,8 +419,8 @@ export default function AdminSettingsPage() {
               WhatsApp notifications
             </h2>
             <p className="mb-5 font-body-md text-body-md text-on-surface-variant">
-              Choose which events send a message to the number below. The instance above must
-              be connected for any alert to deliver.
+              Choose which events send a message to the number below. The instance above must be
+              connected for any alert to deliver.
             </p>
 
             <Field
@@ -449,19 +492,27 @@ export default function AdminSettingsPage() {
             </AdminButton>
           </section>
 
+          <PasswordChange />
+
           {/* Email notifications */}
           <section className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6">
             <h2 className="mb-1 flex items-center gap-2 font-headline-md text-headline-md text-primary">
               <Mail className="h-5 w-5" aria-hidden="true" />
               Email notifications
             </h2>
-            <p className="mb-1 font-body-md text-body-md text-on-surface-variant">
-              Order and booking confirmation emails are sent automatically via Resend. Configure
-              recipients in <code className="rounded bg-surface-container-high px-1.5 py-0.5 font-mono text-[12px]">ADMIN_EMAIL</code> in your server <code className="rounded bg-surface-container-high px-1.5 py-0.5 font-mono text-[12px]">.env</code>.
+            <label className="my-4 flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={settings.email_notifications_enabled}
+                onChange={(e) => set('email_notifications_enabled', e.target.checked)}
+              />
+              Send order and appointment alerts to admin email recipients
+            </label>
+            <p>
+              Customers always receive transactional payment, order and appointment emails. Turning
+              off admin alerts does not turn off customer receipts.
             </p>
-            <p className="font-body-md text-[12px] text-on-surface-variant">
-              Multiple admin recipients are supported — separate addresses with commas.
-            </p>
+            <EmailStatus />
           </section>
 
           {/* Shipping & tax */}
@@ -471,8 +522,16 @@ export default function AdminSettingsPage() {
               Shipping & tax
             </h2>
             <p className="mb-5 font-body-md text-body-md text-on-surface-variant">
-              Rates are applied at checkout based on destination country. All amounts in CAD cents (e.g. 995 = CAD $9.95).
+              Rates are applied at checkout based on destination country. All amounts in CAD cents
+              (e.g. 995 = CAD $9.95).
             </p>
+            <Field
+              label="Free shipping above (CAD cents)"
+              type="number"
+              min={0}
+              value={settings.free_shipping_threshold_cents}
+              onChange={(e) => set('free_shipping_threshold_cents', Number(e.target.value))}
+            />
             <div className="grid gap-4 sm:grid-cols-2">
               <Field
                 label="Canada rate (cents)"
@@ -559,7 +618,8 @@ export default function AdminSettingsPage() {
               Homepage content
             </h2>
             <p className="mb-5 font-body-md text-body-md text-on-surface-variant">
-              Control which products and services are featured, and upload hero images. Featured IDs are comma-separated slugs or UUIDs.
+              Control which products and services are featured, and upload hero images. Featured IDs
+              are comma-separated slugs or UUIDs.
             </p>
 
             <div className="space-y-4">
@@ -583,10 +643,18 @@ export default function AdminSettingsPage() {
 
             {/* Hero image */}
             <div className="mt-6">
-              <p className="mb-2 font-label-sm text-label-sm font-semibold text-on-surface">Hero image</p>
+              <p className="mb-2 font-label-sm text-label-sm font-semibold text-on-surface">
+                Hero image
+              </p>
               {settings.hero_image_url && (
                 <div className="relative mb-3 h-32 w-full overflow-hidden rounded-xl border border-outline-variant">
-                  <Image src={settings.hero_image_url} alt="Hero" fill className="object-cover" sizes="(max-width: 768px) 100vw, 600px" />
+                  <Image
+                    src={settings.hero_image_url}
+                    alt="Hero"
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 600px"
+                  />
                 </div>
               )}
               <Field
@@ -615,10 +683,18 @@ export default function AdminSettingsPage() {
 
             {/* Featured image */}
             <div className="mt-6">
-              <p className="mb-2 font-label-sm text-label-sm font-semibold text-on-surface">Featured section image</p>
+              <p className="mb-2 font-label-sm text-label-sm font-semibold text-on-surface">
+                Featured section image
+              </p>
               {settings.featured_image_url && (
                 <div className="relative mb-3 h-32 w-full overflow-hidden rounded-xl border border-outline-variant">
-                  <Image src={settings.featured_image_url} alt="Featured" fill className="object-cover" sizes="(max-width: 768px) 100vw, 600px" />
+                  <Image
+                    src={settings.featured_image_url}
+                    alt="Featured"
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 600px"
+                  />
                 </div>
               )}
               <Field

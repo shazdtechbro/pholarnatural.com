@@ -16,6 +16,8 @@ export interface WhatsAppQR {
 }
 
 export interface AdminSettingsData {
+  email_notifications_enabled: boolean
+  free_shipping_threshold_cents: number
   notifier_whatsapp_number: string
   low_stock_threshold: number
   notify_new_order: boolean
@@ -47,7 +49,7 @@ const BOOL_DEFAULTS: Record<string, boolean> = {
   notify_new_order: true,
   notify_new_booking: true,
   notify_booking_cancelled: true,
-  notify_payment_failed: false,
+  notify_payment_failed: true,
   notify_new_contact_message: true,
   notify_low_stock: true,
   notify_discount_maxed_out: false,
@@ -61,15 +63,23 @@ function parseBool(raw: string | undefined, key: string): boolean {
 export async function loadAdminSettings(): Promise<AdminSettingsData> {
   const raw = await apiClient<Record<string, string>>('/api/v1/admin/settings', { auth: true })
   return {
+    email_notifications_enabled: raw.email_notifications_enabled !== 'false',
+    free_shipping_threshold_cents: Number(raw.free_shipping_threshold_cents ?? '5000'),
     notifier_whatsapp_number: raw.notifier_whatsapp_number ?? '',
     low_stock_threshold: Number(raw.low_stock_threshold ?? '5'),
     notify_new_order: parseBool(raw.notify_new_order, 'notify_new_order'),
     notify_new_booking: parseBool(raw.notify_new_booking, 'notify_new_booking'),
     notify_booking_cancelled: parseBool(raw.notify_booking_cancelled, 'notify_booking_cancelled'),
     notify_payment_failed: parseBool(raw.notify_payment_failed, 'notify_payment_failed'),
-    notify_new_contact_message: parseBool(raw.notify_new_contact_message, 'notify_new_contact_message'),
+    notify_new_contact_message: parseBool(
+      raw.notify_new_contact_message,
+      'notify_new_contact_message',
+    ),
     notify_low_stock: parseBool(raw.notify_low_stock, 'notify_low_stock'),
-    notify_discount_maxed_out: parseBool(raw.notify_discount_maxed_out, 'notify_discount_maxed_out'),
+    notify_discount_maxed_out: parseBool(
+      raw.notify_discount_maxed_out,
+      'notify_discount_maxed_out',
+    ),
     shipping_rate_domestic_cents: Number(raw.shipping_rate_domestic_cents ?? '995'),
     shipping_rate_us_cents: Number(raw.shipping_rate_us_cents ?? '1499'),
     shipping_rate_uk_cents: Number(raw.shipping_rate_uk_cents ?? '1999'),
@@ -87,6 +97,8 @@ export async function loadAdminSettings(): Promise<AdminSettingsData> {
 
 export async function saveAdminSettings(data: AdminSettingsData): Promise<void> {
   const payload: Record<string, string> = {
+    email_notifications_enabled: String(data.email_notifications_enabled),
+    free_shipping_threshold_cents: String(data.free_shipping_threshold_cents),
     notifier_whatsapp_number: data.notifier_whatsapp_number,
     low_stock_threshold: String(data.low_stock_threshold),
     notify_new_order: String(data.notify_new_order),
@@ -112,7 +124,7 @@ export async function saveAdminSettings(data: AdminSettingsData): Promise<void> 
   await apiClient('/api/v1/admin/settings', { method: 'PUT', body: payload, auth: true })
 }
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? ''
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.pholarnatural.com'
 
 export async function uploadSettingsImage(file: File): Promise<string> {
   const token = typeof window !== 'undefined' ? sessionStorage.getItem('pholar_admin_token') : null

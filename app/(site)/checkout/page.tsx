@@ -9,6 +9,7 @@ import { useCart } from '@/context/CartContext'
 import { formatPrice } from '@/lib/format'
 import { CURRENCY } from '@/lib/config'
 import { createOrder } from '@/lib/api/orders'
+import { getPublicSettings } from '@/lib/api/settings'
 import { validateDiscount } from '@/lib/api/discounts'
 import type { ShippingAddress } from '@/lib/types'
 
@@ -18,6 +19,7 @@ type RateConfig = {
   shipping_rate_uk_cents: number
   shipping_rate_international_cents: number
   tax_rate_percent: number
+  free_shipping_threshold_cents: number
 }
 
 const RATE_DEFAULTS: RateConfig = {
@@ -26,6 +28,7 @@ const RATE_DEFAULTS: RateConfig = {
   shipping_rate_uk_cents: 1999,
   shipping_rate_international_cents: 2499,
   tax_rate_percent: 13,
+  free_shipping_threshold_cents: 5000,
 }
 
 type Errors = Partial<Record<keyof ShippingAddress | 'email', string>>
@@ -41,7 +44,7 @@ const EMPTY: ShippingAddress = {
 }
 
 export default function CheckoutPage() {
-  const { items, subtotalCents, hydrated, clear } = useCart()
+  const { items, subtotalCents, hydrated } = useCart()
 
   const [address, setAddress] = useState<ShippingAddress>(EMPTY)
   const [email, setEmail] = useState('')
@@ -51,20 +54,45 @@ export default function CheckoutPage() {
 
   const [rateConfig, setRateConfig] = useState<RateConfig>(RATE_DEFAULTS)
 
+  const [ratesReady, setRatesReady] = useState(false)
   useEffect(() => {
-    const base = process.env.NEXT_PUBLIC_API_URL ?? ''
-    fetch(`${base}/api/v1/settings/public`)
-      .then((r) => r.json())
-      .then((d) =>
-        setRateConfig({
-          shipping_rate_domestic_cents: parseInt(d.shipping_rate_domestic_cents) || RATE_DEFAULTS.shipping_rate_domestic_cents,
-          shipping_rate_us_cents: parseInt(d.shipping_rate_us_cents) || RATE_DEFAULTS.shipping_rate_us_cents,
-          shipping_rate_uk_cents: parseInt(d.shipping_rate_uk_cents) || RATE_DEFAULTS.shipping_rate_uk_cents,
-          shipping_rate_international_cents: parseInt(d.shipping_rate_international_cents) || RATE_DEFAULTS.shipping_rate_international_cents,
-          tax_rate_percent: parseFloat(d.tax_rate_percent) || RATE_DEFAULTS.tax_rate_percent,
+    let stopped = false
+    const loadRates = () => {
+      if (document.visibilityState === 'hidden') return
+      getPublicSettings()
+        .then((data) => {
+          if (stopped) return
+          const number = (key: keyof RateConfig) =>
+            data[key] !== undefined && Number.isFinite(Number(data[key]))
+              ? Number(data[key])
+              : RATE_DEFAULTS[key]
+          setRateConfig({
+            shipping_rate_domestic_cents: number('shipping_rate_domestic_cents'),
+            shipping_rate_us_cents: number('shipping_rate_us_cents'),
+            shipping_rate_uk_cents: number('shipping_rate_uk_cents'),
+            shipping_rate_international_cents: number('shipping_rate_international_cents'),
+            tax_rate_percent: number('tax_rate_percent'),
+            free_shipping_threshold_cents: number('free_shipping_threshold_cents'),
+          })
+          setRatesReady(true)
+          setFormError((previous) =>
+            previous?.startsWith('We could not load current shipping rates.') ? null : previous,
+          )
         })
-      )
-      .catch(() => {})
+        .catch(() => {
+          if (stopped) return
+          setRatesReady(false)
+          setFormError('We could not load current shipping rates. Refresh this page before paying.')
+        })
+    }
+    loadRates()
+    window.addEventListener('focus', loadRates)
+    const timer = setInterval(loadRates, 30000)
+    return () => {
+      stopped = true
+      clearInterval(timer)
+      window.removeEventListener('focus', loadRates)
+    }
   }, [])
 
   const [discountCode, setDiscountCode] = useState('')
@@ -73,6 +101,8 @@ export default function CheckoutPage() {
   const [appliedDiscount, setAppliedDiscount] = useState<{
     code: string
     discount_cents: number
+    discount_type: string
+    value: number
     message: string
   } | null>(null)
 
@@ -83,7 +113,13 @@ export default function CheckoutPage() {
     setDiscountError(null)
     try {
       const result = await validateDiscount(code, subtotalCents)
-      setAppliedDiscount({ code: result.code, discount_cents: result.discount_cents, message: result.message })
+      setAppliedDiscount({
+        code: result.code,
+        discount_cents: result.discount_cents,
+        discount_type: result.discount_type,
+        value: result.value,
+        message: result.message,
+      })
       setDiscountCode('')
     } catch (err) {
       setDiscountError(err instanceof Error ? err.message : 'Invalid discount code.')
@@ -97,18 +133,30 @@ export default function CheckoutPage() {
     setDiscountError(null)
   }
 
-  const discountedSubtotal = subtotalCents - (appliedDiscount?.discount_cents ?? 0)
+  const discountCents = appliedDiscount
+    ? Math.min(
+        subtotalCents,
+        appliedDiscount.discount_type === 'percentage'
+          ? Math.round((subtotalCents * appliedDiscount.value) / 100)
+          : appliedDiscount.value,
+      )
+    : 0
+  const discountedSubtotal = subtotalCents - discountCents
 
   function shippingCentsFor(country: string): number {
     const c = country.trim().toLowerCase()
     if (c === 'canada' || c === 'ca') return rateConfig.shipping_rate_domestic_cents
     if (c === 'united states' || c === 'us' || c === 'usa') return rateConfig.shipping_rate_us_cents
-    if (c === 'united kingdom' || c === 'uk' || c === 'gb' || c === 'great britain') return rateConfig.shipping_rate_uk_cents
+    if (c === 'united kingdom' || c === 'uk' || c === 'gb' || c === 'great britain')
+      return rateConfig.shipping_rate_uk_cents
     return rateConfig.shipping_rate_international_cents
   }
 
-  const computedShippingCents = shippingCentsFor(address.country)
-  const taxCents = Math.round((discountedSubtotal + computedShippingCents) * rateConfig.tax_rate_percent / 100)
+  const computedShippingCents =
+    subtotalCents > rateConfig.free_shipping_threshold_cents ? 0 : shippingCentsFor(address.country)
+  const taxCents = Math.round(
+    ((discountedSubtotal + computedShippingCents) * rateConfig.tax_rate_percent) / 100,
+  )
   const effectiveTotalCents = discountedSubtotal + computedShippingCents + taxCents
 
   const set = (key: keyof ShippingAddress) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -131,6 +179,10 @@ export default function CheckoutPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setFormError(null)
+    if (!ratesReady) {
+      setFormError('Current shipping rates must load before payment. Please refresh.')
+      return
+    }
     if (!validate()) {
       setFormError('Please correct the highlighted fields.')
       return
@@ -154,8 +206,17 @@ export default function CheckoutPage() {
         discount_code: appliedDiscount?.code,
       })
 
-      // Clear cart before leaving — localStorage is synchronous, so it persists through the redirect.
-      clear()
+      if (
+        !response.confirmation_token ||
+        !response.checkout_url ||
+        new URL(response.checkout_url).protocol !== 'https:' ||
+        new URL(response.checkout_url).hostname !== 'checkout.stripe.com'
+      ) {
+        throw new Error(
+          'Checkout is temporarily unavailable. Please refresh and try again shortly.',
+        )
+      }
+      // Preserve the cart on payment failure or cancellation. Clear only after verified payment.
       window.location.href = response.checkout_url
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
@@ -163,7 +224,14 @@ export default function CheckoutPage() {
     }
   }
 
-  if (hydrated && items.length === 0) {
+  if (!hydrated)
+    return (
+      <p className="px-5 py-20" role="status">
+        Loading your cart…
+      </p>
+    )
+
+  if (items.length === 0) {
     return (
       <div className="mx-auto max-w-3xl px-5 py-24 text-center md:px-16">
         <h1 className="mb-3 font-headline-display text-headline-lg-mobile text-primary md:text-headline-lg">
@@ -196,7 +264,11 @@ export default function CheckoutPage() {
         Checkout
       </h1>
 
-      <form onSubmit={handleSubmit} noValidate className="grid grid-cols-1 gap-10 lg:grid-cols-[1fr_380px]">
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_380px]"
+      >
         <div className="space-y-10">
           {formError && (
             <p
@@ -223,14 +295,61 @@ export default function CheckoutPage() {
           </FieldSet>
 
           <FieldSet legend="Shipping address">
-            <Field label="Full name" required value={address.full_name} error={errors.full_name} onChange={set('full_name')} autoComplete="name" />
-            <Field label="Address line 1" required value={address.address_line1} error={errors.address_line1} onChange={set('address_line1')} autoComplete="address-line1" />
-            <Field label="Address line 2" value={address.address_line2} onChange={set('address_line2')} autoComplete="address-line2" />
+            <Field
+              label="Full name"
+              required
+              value={address.full_name}
+              error={errors.full_name}
+              onChange={set('full_name')}
+              autoComplete="name"
+            />
+            <Field
+              label="Address line 1"
+              required
+              value={address.address_line1}
+              error={errors.address_line1}
+              onChange={set('address_line1')}
+              autoComplete="address-line1"
+            />
+            <Field
+              label="Address line 2"
+              value={address.address_line2}
+              onChange={set('address_line2')}
+              autoComplete="address-line2"
+            />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="City" required value={address.city} error={errors.city} onChange={set('city')} autoComplete="address-level2" />
-              <Field label="Province / State" required value={address.province} error={errors.province} onChange={set('province')} autoComplete="address-level1" />
-              <Field label="Postal / ZIP code" required value={address.postal_code} error={errors.postal_code} onChange={set('postal_code')} autoComplete="postal-code" />
-              <Field label="Country" required value={address.country} error={errors.country} onChange={set('country')} autoComplete="country-name" />
+              <Field
+                label="City"
+                required
+                value={address.city}
+                error={errors.city}
+                onChange={set('city')}
+                autoComplete="address-level2"
+              />
+              <Field
+                label="Province / State"
+                required
+                value={address.province}
+                error={errors.province}
+                onChange={set('province')}
+                autoComplete="address-level1"
+              />
+              <Field
+                label="Postal / ZIP code"
+                required
+                value={address.postal_code}
+                error={errors.postal_code}
+                onChange={set('postal_code')}
+                autoComplete="postal-code"
+              />
+              <Field
+                label="Country"
+                required
+                value={address.country}
+                error={errors.country}
+                onChange={set('country')}
+                autoComplete="country-name"
+              />
             </div>
           </FieldSet>
 
@@ -279,13 +398,23 @@ export default function CheckoutPage() {
               </div>
             ) : (
               <div className="flex gap-2">
-                <label htmlFor="discount-code" className="sr-only">Discount code</label>
+                <label htmlFor="discount-code" className="sr-only">
+                  Discount code
+                </label>
                 <input
                   id="discount-code"
                   type="text"
                   value={discountCode}
-                  onChange={(e) => { setDiscountCode(e.target.value); setDiscountError(null) }}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyDiscount() } }}
+                  onChange={(e) => {
+                    setDiscountCode(e.target.value)
+                    setDiscountError(null)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      applyDiscount()
+                    }
+                  }}
                   placeholder="Enter code"
                   className="min-w-0 flex-1 rounded-xl border border-outline bg-surface-container-lowest px-4 py-3 font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:outline-none"
                   aria-describedby={discountError ? 'discount-error' : undefined}
@@ -325,15 +454,21 @@ export default function CheckoutPage() {
             {items.map((i) => (
               <li key={i.key} className="flex gap-3">
                 <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-container">
-                  {i.image_url && <Image src={i.image_url} alt="" fill sizes="64px" className="object-cover" />}
+                  {i.image_url && (
+                    <Image src={i.image_url} alt="" fill sizes="64px" className="object-cover" />
+                  )}
                   <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-white">
                     {i.quantity}
                   </span>
                 </div>
                 <div className="flex flex-1 items-center justify-between gap-2">
                   <div>
-                    <p className="font-body-md text-[13px] font-semibold text-on-surface">{i.product_name}</p>
-                    <p className="font-body-md text-[12px] text-on-surface-variant">{i.variant_label}</p>
+                    <p className="font-body-md text-[13px] font-semibold text-on-surface">
+                      {i.product_name}
+                    </p>
+                    <p className="font-body-md text-[12px] text-on-surface-variant">
+                      {i.variant_label}
+                    </p>
                   </div>
                   <p className="whitespace-nowrap font-body-md text-[13px] font-bold text-primary">
                     {formatPrice(i.unit_price_cents * i.quantity)}
@@ -354,7 +489,7 @@ export default function CheckoutPage() {
                   <Tag className="h-3.5 w-3.5" aria-hidden="true" />
                   {appliedDiscount.code}
                 </dt>
-                <dd>−{formatPrice(appliedDiscount.discount_cents)}</dd>
+                <dd>−{formatPrice(discountCents)}</dd>
               </div>
             )}
             <div className="flex justify-between font-body-md text-body-md">
@@ -372,12 +507,13 @@ export default function CheckoutPage() {
           </dl>
 
           <p className="mt-4 rounded-xl bg-surface-container-lowest px-4 py-3 font-body-md text-[12px] text-on-surface-variant">
-            You&apos;ll complete payment on Stripe&apos;s secure hosted page. Your card details never touch our servers.
+            You&apos;ll complete payment on Stripe&apos;s secure hosted page. Your card details
+            never touch our servers.
           </p>
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || !ratesReady}
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-primary py-4 font-label-sm text-label-sm text-white transition-opacity hover:opacity-90 disabled:opacity-60"
           >
             {submitting ? (

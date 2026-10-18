@@ -1,88 +1,126 @@
 'use client'
-
 import Link from 'next/link'
-import { Suspense, useEffect } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { getOrderConfirmation, type ConfirmedOrder } from '@/lib/api/orders'
 import { useCart } from '@/context/CartContext'
-import { Check, Mail, ArrowRight, ShoppingBag } from 'lucide-react'
-import { CURRENCY } from '@/lib/config'
+import { formatPrice } from '@/lib/format'
 
-function SuccessContent() {
-  const searchParams = useSearchParams()
-  // session_id is forwarded by Stripe; we use it only for display — no need to fetch
-  const sessionId = searchParams.get('session_id')
+function OrderConfirmation() {
+  const params = useSearchParams(),
+    id = params.get('id'),
+    token = params.get('token')
+  const [order, setOrder] = useState<ConfirmedOrder | null>(null)
+  const [error, setError] = useState('')
   const { clear } = useCart()
-
-  // Clear the cart in case the user returns here after the redirect.
   useEffect(() => {
-    clear()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  return (
-    <div className="mx-auto max-w-2xl px-5 py-24 text-center md:px-16">
-      <span
-        className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary text-white"
-        aria-hidden="true"
-      >
-        <Check className="h-10 w-10" />
-      </span>
-
-      <h1 className="mb-4 font-headline-display text-headline-lg-mobile text-primary md:text-headline-lg">
-        Payment confirmed
-      </h1>
-
-      <p className="mb-2 font-body-lg text-body-lg text-on-surface-variant">
-        Your order has been received and is now being processed.
-      </p>
-
-      {sessionId && (
-        <p className="mb-6 font-body-md text-[13px] text-on-surface-variant">
-          Reference: <span className="font-mono font-semibold text-on-surface">{sessionId.slice(-8).toUpperCase()}</span>
+    if (!id || !token) return
+    let cancelled = false,
+      timer: ReturnType<typeof setTimeout>,
+      attempts = 0
+    async function check() {
+      try {
+        const record = await getOrderConfirmation(id!, token!)
+        if (cancelled) return
+        setOrder(record)
+        if (['paid', 'confirmed', 'processing', 'shipped', 'delivered'].includes(record.status))
+          clear()
+        else if (record.status === 'pending' && ++attempts < 30) timer = setTimeout(check, 2000)
+      } catch (err) {
+        if (!cancelled)
+          setError(
+            err instanceof Error ? err.message : 'Could not verify payment. Please contact us.',
+          )
+      }
+    }
+    void check()
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [id, token, clear])
+  if (!id || !token)
+    return (
+      <section className="mx-auto max-w-xl px-5 py-20">
+        <h1 className="text-headline-md">No order confirmation link</h1>
+        <p className="my-5">
+          Return here using your checkout confirmation link. Your payment has not been verified on
+          this page.
         </p>
-      )}
-
-      <p className="mx-auto mb-10 flex max-w-md items-center justify-center gap-2 rounded-xl bg-primary/10 p-4 font-body-md text-[13px] text-primary">
-        <Mail className="h-4 w-4 shrink-0" aria-hidden="true" />
-        A confirmation email is on its way. Check your inbox — and spam, just in case.
+        <Link href="/cart">Return to cart</Link>
+      </section>
+    )
+  if (error)
+    return (
+      <section className="mx-auto max-w-xl px-5 py-20" role="alert">
+        <h1>We could not verify this order</h1>
+        <p>{error}</p>
+        <Link href="/contact">Contact us</Link>
+      </section>
+    )
+  if (!order)
+    return (
+      <p className="px-5 py-20" role="status">
+        Checking your payment…
       </p>
-
-      <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-        <Link
-          href="/shop"
-          className="inline-flex items-center gap-2 rounded-full bg-primary px-8 py-4 font-label-sm text-label-sm text-white transition-opacity hover:opacity-90"
-        >
-          <ShoppingBag className="h-4 w-4" aria-hidden="true" />
-          Continue Shopping
-        </Link>
-        <Link
-          href="/"
-          className="inline-flex items-center justify-center gap-2 rounded-full border border-outline px-8 py-4 font-label-sm text-label-sm text-on-surface-variant transition-colors hover:bg-surface-container-high"
-        >
-          Back to Home
-          <ArrowRight className="h-4 w-4" aria-hidden="true" />
-        </Link>
-      </div>
-
-      <p className="mt-10 font-body-md text-[12px] text-on-surface-variant">
-        All prices in {CURRENCY}. Questions?{' '}
-        <Link href="/contact" className="underline underline-offset-2">
-          Contact us
-        </Link>{' '}
-        or see our{' '}
-        <Link href="/refund-policy" className="underline underline-offset-2">
-          refund policy
-        </Link>
-        .
+    )
+  const paid = ['paid', 'confirmed', 'processing', 'shipped', 'delivered'].includes(order.status)
+  return (
+    <section className="mx-auto max-w-2xl px-5 py-16">
+      <h1 className="font-headline-lg text-headline-lg-mobile text-primary">
+        {paid
+          ? 'Thank you for your order'
+          : order.status === 'pending'
+            ? 'Waiting for payment confirmation'
+            : `Order ${order.status.replace('_', ' ')}`}
+      </h1>
+      <p className="my-4" role="status">
+        Reference {order.order_number}.{' '}
+        {paid
+          ? 'Your payment is verified. We will email your receipt and order updates.'
+          : 'This page reflects the latest verified payment status. If you paid recently, please check back shortly or contact us.'}
       </p>
-    </div>
+      <ul className="my-8 space-y-4">
+        {order.items.map((i) => (
+          <li key={i.id} className="flex flex-wrap justify-between gap-2">
+            <span>
+              {i.product_name} · {i.variant_label} × {i.quantity}
+            </span>
+            <strong>{formatPrice(i.quantity * i.unit_price_cents)}</strong>
+          </li>
+        ))}
+      </ul>
+      <dl className="space-y-3 border-t py-5">
+        {[
+          ['Subtotal', order.subtotal_cents],
+          ['Discount', -order.discount_cents],
+          ['Shipping', order.shipping_cents],
+          ['Tax', order.tax_cents],
+          ['Total', order.total_cents],
+        ].map(([label, amount]) => (
+          <div className="flex justify-between" key={label}>
+            <dt>{label}</dt>
+            <dd>{formatPrice(Number(amount))}</dd>
+          </div>
+        ))}
+      </dl>
+      <h2 className="font-bold">Shipping address</h2>
+      <address className="my-4 not-italic">
+        {Object.values(order.shipping_address).filter(Boolean).join(', ')}
+      </address>
+      <p className="my-4">
+        Orders are processed in 1–2 business days. We will email you when the parcel is dispatched.
+      </p>
+      <Link href="/shop" className="underline">
+        Continue shopping
+      </Link>
+    </section>
   )
 }
-
 export default function CheckoutSuccessPage() {
   return (
-    <Suspense fallback={<div className="mx-auto max-w-2xl px-5 py-24" aria-busy="true" />}>
-      <SuccessContent />
+    <Suspense fallback={<p>Checking your order…</p>}>
+      <OrderConfirmation />
     </Suspense>
   )
 }

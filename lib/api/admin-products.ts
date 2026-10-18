@@ -1,8 +1,6 @@
 import { apiClient } from './client'
 
-const BASE = (
-  process.env.NEXT_PUBLIC_API_URL ?? 'https://api.pholarnatural.com'
-).replace(/\/$/, '')
+const BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'https://api.pholarnatural.com').replace(/\/$/, '')
 
 // ─── Response shapes ──────────────────────────────────────────────────────────
 
@@ -24,6 +22,9 @@ export interface AdminProductVariant {
 }
 
 export interface AdminProduct {
+  seo_title?: string | null
+  seo_description?: string | null
+  is_bestseller?: boolean
   id: string
   name: string
   slug: string
@@ -40,6 +41,9 @@ export interface AdminProduct {
 // ─── Request payloads ─────────────────────────────────────────────────────────
 
 export interface ProductCreatePayload {
+  seo_title?: string | null
+  seo_description?: string | null
+  is_bestseller?: boolean
   name: string
   tagline?: string
   description?: string
@@ -49,6 +53,9 @@ export interface ProductCreatePayload {
 }
 
 export interface ProductUpdatePayload {
+  seo_title?: string | null
+  seo_description?: string | null
+  is_bestseller?: boolean
   name?: string
   slug?: string
   tagline?: string
@@ -73,11 +80,19 @@ export function listAdminProducts(): Promise<AdminProduct[]> {
 }
 
 export function createAdminProduct(data: ProductCreatePayload): Promise<AdminProduct> {
-  return apiClient<AdminProduct>('/api/v1/admin/products/', { method: 'POST', body: data, auth: true })
+  return apiClient<AdminProduct>('/api/v1/admin/products/', {
+    method: 'POST',
+    body: data,
+    auth: true,
+  })
 }
 
 export function updateAdminProduct(id: string, data: ProductUpdatePayload): Promise<AdminProduct> {
-  return apiClient<AdminProduct>(`/api/v1/admin/products/${id}`, { method: 'PUT', body: data, auth: true })
+  return apiClient<AdminProduct>(`/api/v1/admin/products/${id}`, {
+    method: 'PUT',
+    body: data,
+    auth: true,
+  })
 }
 
 export function deleteAdminProduct(id: string): Promise<void> {
@@ -112,8 +127,7 @@ export async function uploadProductImage(
   productId: string,
   file: File,
 ): Promise<AdminProductImage> {
-  const token =
-    typeof window !== 'undefined' ? sessionStorage.getItem('pholar_admin_token') : null
+  const token = typeof window !== 'undefined' ? sessionStorage.getItem('pholar_admin_token') : null
 
   const form = new FormData()
   form.append('file', file)
@@ -138,3 +152,10 @@ export function deleteProductImage(productId: string, imageId: string): Promise<
     auth: true,
   })
 }
+
+export const reorderProductImages = (productId: string, imageIds: string[]) =>
+  apiClient(`/api/v1/admin/products/${productId}/images/order`, {
+    method: 'PUT',
+    auth: true,
+    body: imageIds,
+  })

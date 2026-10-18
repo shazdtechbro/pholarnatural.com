@@ -1,9 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-
 from app.api.dependencies import get_db, get_payment_gateway
-from app.services import booking_service, order_service
-from app.services.payment_gateway import PaymentGateway
+from app.models.order import Order
+from app.models.booking import Booking
+from app.models.product import ProductVariant
+from app.services import order_service, booking_service
+from app.services.email import (
+    queue_order_status,
+    queue_booking_cancelled,
+    queue_payment_failed,
+)
+from app.core.transactions import transaction_lock
 
 router = APIRouter()
 
@@ -12,102 +19,211 @@ router = APIRouter()
 async def stripe_webhook(
     request: Request,
     db: Session = Depends(get_db),
-    payment_gateway: PaymentGateway = Depends(get_payment_gateway),
+    payment_gateway=Depends(get_payment_gateway),
 ):
-    """
-    Single endpoint for all Stripe webhooks.
-    Registered in main.py at prefix /api/v1/webhooks/payments.
-    Webhook path: POST /api/v1/webhooks/payments
-
-    Handled events:
-      checkout.session.completed    → confirm order + stock decrement + WhatsApp + email
-      payment_intent.succeeded      → confirm booking deposit + WhatsApp + email
-      payment_intent.payment_failed → mark booking payment_failed + WhatsApp
-    """
     payload = await request.body()
-    sig_header = request.headers.get("stripe-signature")
-
+    if len(payload) > 1_000_000:
+        raise HTTPException(413, "Webhook too large.")
     try:
-        event = payment_gateway.verify_webhook_signature(payload, sig_header)
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-
-    event_type = event["type"]
-
-    # ── Product order paid via Checkout Session ────────────────────────────────
-    if event_type == "checkout.session.completed":
-        session = event["data"]["object"]
-        metadata = session.get("metadata") or {}
-
-        if metadata.get("type") == "product_order":
-            from app.services.email import (  # noqa: PLC0415
-                send_email, send_admin_email,
-                order_confirmation_email, admin_order_notification_email,
+        event = payment_gateway.verify_webhook_signature(
+            payload, request.headers.get("stripe-signature")
+        )
+    except RuntimeError:
+        raise HTTPException(503, "Webhook verification is not configured.")
+    except Exception:
+        raise HTTPException(400, "Invalid webhook signature.")
+    kind = event["type"]
+    obj = event["data"]["object"]
+    metadata = obj.get("metadata") or {}
+    if (
+        kind
+        in ("checkout.session.completed", "checkout.session.async_payment_succeeded")
+        and metadata.get("type") == "product_order"
+    ):
+        transaction_lock(db, 902)
+        order = db.query(Order).filter(Order.stripe_session_id == obj["id"]).first()
+        if not order:
+            raise HTTPException(400, "Unknown checkout session.")
+        if (
+            str(order.id) != metadata.get("order_id")
+            or obj.get("currency") != "cad"
+            or obj.get("amount_total") != order.total_cents
+        ):
+            raise HTTPException(400, "Checkout payment details do not match the order.")
+        if obj.get("payment_status") != "paid":
+            return {"received": True}
+        try:
+            order.stripe_payment_intent_id = obj.get("payment_intent")
+            order_service.confirm_order_payment(
+                db, obj["id"], obj.get("payment_intent")
             )
-            order = order_service.confirm_order_payment(db=db, session_id=session["id"])
-            if order:
-                subj, html = order_confirmation_email(order)
-                send_email(order.customer_email, subj, html)
-                send_admin_email(*admin_order_notification_email(order))
-
-    # ── Booking deposit paid via Payment Intent ────────────────────────────────
-    elif event_type == "payment_intent.succeeded":
-        pi = event["data"]["object"]
-        metadata = pi.get("metadata") or {}
-
-        if metadata.get("type") == "booking_deposit":
-            from app.services.whatsapp import notify, NotificationEvent  # noqa: PLC0415
-            from app.services.email import (  # noqa: PLC0415
-                send_email, send_admin_email,
-                booking_confirmation_email, admin_booking_notification_email,
+            db.commit()
+        except HTTPException as exc:
+            if exc.status_code != 409:
+                raise
+            # A late payment cannot fulfill more stock than exists; refund it safely.
+            if not obj.get("payment_intent"):
+                raise
+            refund = payment_gateway.create_refund(obj["payment_intent"])
+            if refund.get("status") not in ("succeeded", "pending"):
+                raise HTTPException(502, "Refund reconciliation required.")
+            order.stripe_payment_intent_id = obj["payment_intent"]
+            order.status = (
+                "refunded" if refund["status"] == "succeeded" else "refund_pending"
             )
-
-            booking = booking_service.confirm_booking_payment_intent(
-                db=db, payment_intent_id=pi["id"]
+            queue_order_status(db, order)
+            db.commit()
+    elif (
+        kind in ("payment_intent.succeeded", "payment_intent.payment_failed")
+        and metadata.get("type") == "booking_deposit"
+    ):
+        transaction_lock(db, 903)
+        booking = (
+            db.query(Booking)
+            .filter(Booking.stripe_payment_intent_id == obj["id"])
+            .first()
+        )
+        if not booking:
+            raise HTTPException(400, "Unknown booking payment.")
+        if (
+            str(booking.id) != metadata.get("booking_id")
+            or obj.get("currency") != "cad"
+            or obj.get("amount") != booking.deposit_cents
+        ):
+            raise HTTPException(
+                400, "Deposit payment details do not match the booking."
             )
-            if booking:
-                service_name = booking.service.name if booking.service else "Service"
-                booking_date = booking.booking_date.strftime("%a %d %b %Y")
-                start_time = booking.start_time.strftime("%I:%M %p").lstrip("0")
-
-                # WhatsApp — independent path
-                notify(
-                    NotificationEvent.NEW_BOOKING,
-                    f"📅 New Booking — PN-{str(booking.id)[:8].upper()}\n"
-                    f"{booking.customer_name} — {service_name}\n"
-                    f"{booking_date} at {start_time}\n"
-                    f"Deposit: CAD ${booking.deposit_cents / 100:.2f}\n"
-                    f"pholarnatural.com/admin/bookings",
-                    db,
-                )
-
-                # Email — independent path
-                subj, html = booking_confirmation_email(booking)
-                send_email(booking.customer_email, subj, html)
-                send_admin_email(*admin_booking_notification_email(booking))
-
-    # ── Booking deposit payment failed ─────────────────────────────────────────
-    elif event_type == "payment_intent.payment_failed":
-        pi = event["data"]["object"]
-        metadata = pi.get("metadata") or {}
-
-        if metadata.get("type") == "booking_deposit":
-            from app.services.whatsapp import notify, NotificationEvent  # noqa: PLC0415
-
-            booking = booking_service.fail_booking_payment(
-                db=db, payment_intent_id=pi["id"]
+        if kind == "payment_intent.succeeded":
+            if obj.get("amount_received") != booking.deposit_cents:
+                raise HTTPException(400, "Deposit amount mismatch.")
+            booking_service.confirm_booking_payment_intent(
+                db, obj["id"], payment_gateway
             )
-            if booking:
-                service_name = booking.service.name if booking.service else "Service"
-                booking_date = booking.booking_date.strftime("%a %d %b %Y")
-                start_time = booking.start_time.strftime("%I:%M %p").lstrip("0")
+        else:
+            booking_service.fail_booking_payment(db, obj["id"])
+    elif kind in ("checkout.session.expired", "checkout.session.async_payment_failed"):
+        transaction_lock(db, 902)
+        order = db.query(Order).filter(Order.stripe_session_id == obj["id"]).first()
+        if order and order.status == "pending":
+            order.status = "expired"
+            if kind.endswith("failed"):
+                queue_payment_failed(db, order, "order")
+            db.commit()
+            if kind.endswith("failed"):
+                from app.services.whatsapp import notify, NotificationEvent
+
                 notify(
                     NotificationEvent.PAYMENT_FAILED,
-                    f"💳 Payment Failed — PN-{str(booking.id)[:8].upper()}\n"
-                    f"{booking.customer_name} — {service_name}\n"
-                    f"{booking_date} at {start_time}\n"
-                    f"pholarnatural.com/admin/bookings",
+                    f"Payment failed for order PN-{str(order.id)[:8].upper()}",
                     db,
                 )
+    elif (
+        kind in ("refund.created", "refund.updated")
+        and obj.get("status") == "succeeded"
+    ):
+        complete_refund(
+            db, obj.get("payment_intent"), obj.get("amount"), str(obj["id"])
+        )
+    elif kind == "charge.refunded" and obj.get("refunded"):
+        refunds = (obj.get("refunds") or {}).get("data") or []
+        # A charge may report a refund while the bank transfer is still pending.
+        succeeded = sum(
+            item.get("amount", 0)
+            for item in refunds
+            if item.get("status") == "succeeded"
+        )
+        if succeeded >= obj.get("amount", 0) > 0:
+            complete_refund(
+                db, obj.get("payment_intent"), obj["amount"], str(obj["id"])
+            )
+    elif kind in ("refund.failed", "refund.updated") and obj.get("status") == "failed":
+        transaction_lock(db, 902)
+        transaction_lock(db, 903)
+        from app.services.email import queue_email, queue_admin, message
 
-    return {"status": "ok"}
+        order = (
+            db.query(Order)
+            .filter(Order.stripe_payment_intent_id == obj.get("payment_intent"))
+            .first()
+            if obj.get("payment_intent")
+            else None
+        )
+        booking = (
+            db.query(Booking)
+            .filter(Booking.stripe_payment_intent_id == obj.get("payment_intent"))
+            .first()
+            if obj.get("payment_intent")
+            else None
+        )
+        record = order or booking
+        if record:
+            if order and order.status == "refund_pending":
+                order.status = "paid"
+            if booking and booking.status == "refund_pending":
+                booking.status = "cancelled"
+            content = message(
+                "Refund needs attention",
+                [
+                    f"Reference PN-{str(record.id)[:8].upper()}",
+                    "The payment provider could not complete your refund. Please contact the studio; we will help resolve it.",
+                ],
+            )
+            key = "refund-failed:" + str(obj["id"])
+            queue_email(db, key, record.customer_email, *content)
+            queue_admin(db, key, content)
+            db.commit()
+    return {"received": True}
+
+
+def complete_refund(db, payment_intent_id, amount, refund_id):
+    if not payment_intent_id or not isinstance(amount, int) or amount <= 0:
+        return
+    transaction_lock(db, 902)
+    transaction_lock(db, 903)
+    from app.services.email import queue_email, queue_admin, message, cad
+
+    order = (
+        db.query(Order)
+        .filter(Order.stripe_payment_intent_id == payment_intent_id)
+        .first()
+    )
+    booking = (
+        db.query(Booking)
+        .filter(Booking.stripe_payment_intent_id == payment_intent_id)
+        .first()
+    )
+    record = order or booking
+    if not record:
+        return
+    full = amount == (order.total_cents if order else booking.deposit_cents)
+    if full and record.status == "refunded":
+        return
+    if full and order:
+        if order.status in (*order_service.PAID_STATUSES, "refund_pending"):
+            for item in order.items:
+                variant = (
+                    db.query(ProductVariant)
+                    .filter(ProductVariant.id == item.product_variant_id)
+                    .with_for_update()
+                    .first()
+                )
+                if variant:
+                    variant.stock_count += item.quantity
+        order.status = "refunded"
+        queue_order_status(db, order)
+    else:
+        if full:
+            booking.status = "refunded"
+        key = (
+            f"booking:{booking.id}:refunded" if full else "partial-refund:" + refund_id
+        )
+        content = message(
+            "Refund completed",
+            [
+                f"Reference PN-{str(record.id)[:8].upper()}",
+                f"{cad(amount)} has been refunded to the original payment method. Your bank may take 5–10 business days to display it.",
+            ],
+        )
+        queue_email(db, key, record.customer_email, *content)
+        queue_admin(db, key, content)
+    db.commit()

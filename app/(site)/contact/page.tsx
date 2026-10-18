@@ -1,7 +1,8 @@
+import { getPublicSettings } from '@/lib/api/settings'
 import type { Metadata } from 'next'
 import { Mail, MapPin, Phone, Clock } from 'lucide-react'
 import ContactForm from '@/components/ContactForm'
-import { InstagramIcon, FacebookIcon } from '@/components/icons/Social'
+import { InstagramIcon, FacebookIcon, TikTokIcon } from '@/components/icons/Social'
 import { BUSINESS } from '@/lib/config'
 
 export const metadata: Metadata = {
@@ -16,7 +17,8 @@ export const metadata: Metadata = {
   },
 }
 
-export default function ContactPage() {
+export default async function ContactPage() {
+  const settings = await getPublicSettings()
   return (
     <div className="mx-auto max-w-7xl px-5 py-16 md:px-16">
       <header className="mb-12 max-w-2xl">
@@ -37,7 +39,9 @@ export default function ContactPage() {
 
         <aside className="space-y-6">
           <section className="rounded-2xl border border-outline-variant bg-surface-container-low p-6">
-            <h2 className="mb-4 font-label-sm text-label-sm font-bold uppercase text-primary">Email us</h2>
+            <h2 className="mb-4 font-label-sm text-label-sm font-bold uppercase text-primary">
+              Email us
+            </h2>
             <p className="flex items-start gap-3 font-body-md text-body-md text-on-surface-variant">
               <Mail className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden="true" />
               <a href={`mailto:${BUSINESS.email}`} className="hover:text-primary hover:underline">
@@ -46,7 +50,10 @@ export default function ContactPage() {
             </p>
             <p className="mt-3 flex items-start gap-3 font-body-md text-body-md text-on-surface-variant">
               <Phone className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden="true" />
-              <a href={`tel:${BUSINESS.phone.replace(/\s/g, '')}`} className="hover:text-primary hover:underline">
+              <a
+                href={`tel:${BUSINESS.phone.replace(/\s/g, '')}`}
+                className="hover:text-primary hover:underline"
+              >
                 {BUSINESS.phone}
               </a>
             </p>
@@ -73,30 +80,29 @@ export default function ContactPage() {
           </section>
 
           <section className="rounded-2xl border border-outline-variant bg-surface-container-low p-6">
-            <h2 className="mb-4 font-label-sm text-label-sm font-bold uppercase text-primary">Socials</h2>
+            <h2 className="mb-4 font-label-sm text-label-sm font-bold uppercase text-primary">
+              Socials
+            </h2>
             <ul className="flex gap-3">
-              <li>
-                <a
-                  href="https://instagram.com"
-                  aria-label="Pholar Natural on Instagram"
-                  className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-container-lowest text-primary transition-colors hover:bg-primary hover:text-white"
-                >
-                  <InstagramIcon className="h-5 w-5" />
-                </a>
-              </li>
-              <li>
-                <a
-                  href="https://facebook.com"
-                  aria-label="Pholar Natural on Facebook"
-                  className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-container-lowest text-primary transition-colors hover:bg-primary hover:text-white"
-                >
-                  <FacebookIcon className="h-5 w-5" />
-                </a>
-              </li>
+              {[
+                { key: 'instagram_url', name: 'Instagram', Icon: InstagramIcon },
+                { key: 'facebook_url', name: 'Facebook', Icon: FacebookIcon },
+                { key: 'tiktok_url', name: 'TikTok', Icon: TikTokIcon },
+              ]
+                .filter((item) => settings[item.key])
+                .map(({ key, name, Icon }) => (
+                  <li key={key}>
+                    <a
+                      href={settings[key]}
+                      aria-label={`Pholar Natural on ${name}`}
+                      rel="noopener noreferrer"
+                      className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-container-lowest text-primary"
+                    >
+                      <Icon className="h-5 w-5" />
+                    </a>
+                  </li>
+                ))}
             </ul>
-            <p className="mt-4 font-body-md text-[12px] text-on-surface-variant">
-              Social handles are placeholders until the client confirms their accounts.
-            </p>
           </section>
         </aside>
       </div>

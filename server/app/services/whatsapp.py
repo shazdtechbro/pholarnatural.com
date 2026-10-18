@@ -71,6 +71,7 @@ def _headers() -> dict:
 
 # ─── Low-level HTTP helpers ───────────────────────────────────────────────────
 
+
 def _get(path: str, timeout: int = 5) -> dict:
     req = urllib.request.Request(f"{_base()}{path}", headers=_headers())
     with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -101,6 +102,7 @@ def _delete(path: str, timeout: int = 10) -> dict:
 
 # ─── Public service functions ─────────────────────────────────────────────────
 
+
 def get_whatsapp_connection_status() -> dict:
     """
     GET /instance/connectionState/pholar-notifier.
@@ -119,7 +121,7 @@ def get_whatsapp_connection_status() -> dict:
         phone = raw_id.split("@")[0] if raw_id else None
         return {"connected": state == "open", "state": state, "phone": phone}
     except Exception as exc:
-        logger.error("WhatsApp status check failed: %s", exc)
+        logger.error("WhatsApp status check failed: %s", type(exc).__name__)
         return {"connected": False, "state": "error", "phone": None}
 
 
@@ -131,7 +133,11 @@ def get_whatsapp_qr() -> dict:
     Never raises — returns nulls with an "error" key on failure.
     """
     if not settings.EVOLUTION_API_KEY:
-        return {"base64": None, "code": None, "error": "EVOLUTION_API_KEY not configured"}
+        return {
+            "base64": None,
+            "code": None,
+            "error": "EVOLUTION_API_KEY not configured",
+        }
     try:
         data = _get(f"/instance/connect/{INSTANCE_NAME}", timeout=15)
         # Evolution API v2: {"pairingCode": null, "code": "...", "base64": "data:image/png;..."}
@@ -146,11 +152,19 @@ def get_whatsapp_qr() -> dict:
             body = json.loads(exc.read())
         except Exception:
             pass
-        logger.warning("WhatsApp QR returned HTTP %s: %s", exc.code, body)
-        return {"base64": None, "code": None, "error": body.get("message", f"HTTP {exc.code}")}
+        logger.warning("WhatsApp QR returned HTTP %s", exc.code)
+        return {
+            "base64": None,
+            "code": None,
+            "error": f"WhatsApp provider returned HTTP {exc.code}",
+        }
     except Exception as exc:
-        logger.error("WhatsApp QR fetch failed: %s", exc)
-        return {"base64": None, "code": None, "error": str(exc)}
+        logger.error("WhatsApp QR fetch failed: %s", type(exc).__name__)
+        return {
+            "base64": None,
+            "code": None,
+            "error": "WhatsApp connection unavailable",
+        }
 
 
 def logout_whatsapp() -> None:
@@ -192,7 +206,9 @@ def notify(event: NotificationEvent, message: str, db: Session) -> None:
         if not number:
             return
     except Exception as exc:
-        logger.error("notify: failed reading settings for %s: %s", event, exc)
+        logger.error(
+            "notify: failed reading settings for %s: %s", event, type(exc).__name__
+        )
         return
 
     def _send() -> None:
@@ -200,6 +216,6 @@ def notify(event: NotificationEvent, message: str, db: Session) -> None:
             send_whatsapp_notification(number=number, message=message)
             logger.debug("WhatsApp sent for %s", event)
         except Exception as exc:
-            logger.error("WhatsApp send failed for %s: %s", event, exc)
+            logger.error("WhatsApp send failed for %s: %s", event, type(exc).__name__)
 
     threading.Thread(target=_send, daemon=True).start()

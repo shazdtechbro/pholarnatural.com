@@ -221,3 +221,15 @@
     100% { transform: translate(40px, -60px) scale(1.1); }
   }
 }
+/* Keep long names, flexible controls and decorative effects inside small viewports. */
+html, body { max-width: 100%; overflow-x: clip; }
+main { min-width: 0; }
+main input, main select, main textarea { max-width: 100%; min-width: 0; }
+main h1, main h2, main h3, main p, main dd { overflow-wrap: anywhere; }
+@media (max-width: 639px) {
+  main table { table-layout: fixed; width: 100%; }
+  main th, main td { overflow-wrap: anywhere; }
+}
+
+fieldset { min-inline-size: 0; }
+main form > *, main section > * { min-width: 0; }

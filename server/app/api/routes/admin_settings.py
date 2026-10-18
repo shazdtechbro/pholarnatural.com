@@ -17,7 +17,9 @@ _PUBLIC_KEYS = [
     "shipping_rate_us_cents",
     "shipping_rate_uk_cents",
     "shipping_rate_international_cents",
+    "low_stock_threshold",
     "tax_rate_percent",
+    "free_shipping_threshold_cents",
     "instagram_url",
     "facebook_url",
     "tiktok_url",
@@ -32,7 +34,9 @@ _PUBLIC_DEFAULTS = {
     "shipping_rate_us_cents": "1499",
     "shipping_rate_uk_cents": "1999",
     "shipping_rate_international_cents": "2499",
+    "low_stock_threshold": "5",
     "tax_rate_percent": "13",
+    "free_shipping_threshold_cents": "5000",
     "instagram_url": "",
     "facebook_url": "",
     "tiktok_url": "",
@@ -60,13 +64,16 @@ async def upload_settings_image(
 ):
     """Upload a hero or featured image to Cloudinary. Returns {url: str}."""
     from app.services.storage_service import CloudinaryStorageService  # noqa: PLC0415
+
     try:
         storage = CloudinaryStorageService()
         contents = await file.read()
         url = storage.upload_image(contents, folder="settings")
         return {"url": url}
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Upload failed: {exc}")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=502, detail="Image upload unavailable.")
 
 
 @router.get("/settings")
@@ -120,8 +127,8 @@ def whatsapp_logout(
     try:
         whatsapp.logout_whatsapp()
         return {"ok": True}
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Logout failed: {exc}")
+    except Exception:
+        raise HTTPException(status_code=502, detail="Could not disconnect WhatsApp.")
 
 
 @router.post("/whatsapp/test")
@@ -145,5 +152,50 @@ def whatsapp_test(
             ),
         )
         return {"ok": True}
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"WhatsApp send failed: {exc}")
+    except Exception:
+        raise HTTPException(
+            status_code=502, detail="WhatsApp test could not be delivered."
+        )
+
+
+@router.get("/email/status")
+def email_status(
+    db: Session = Depends(get_db), current_admin: AdminUser = Depends(get_current_admin)
+):
+    from app.core.config import settings
+    from app.models.notification import EmailDelivery
+
+    return {
+        "configured": bool(settings.RESEND_API_KEY),
+        "admin_recipient_configured": bool(settings.ADMIN_EMAIL),
+        "queued": db.query(EmailDelivery)
+        .filter(EmailDelivery.status == "queued")
+        .count(),
+        "sent": db.query(EmailDelivery).filter(EmailDelivery.status == "sent").count(),
+        "retrying": db.query(EmailDelivery)
+        .filter(EmailDelivery.status == "queued", EmailDelivery.attempts > 0)
+        .count(),
+    }
+
+
+@router.post("/email/test", status_code=202)
+def email_test(
+    db: Session = Depends(get_db), current_admin: AdminUser = Depends(get_current_admin)
+):
+    from app.core.config import settings
+    from app.services.email import queue_email, message
+    from uuid import uuid4
+
+    if not settings.RESEND_API_KEY:
+        raise HTTPException(409, "Email provider has not been configured.")
+    queue_email(
+        db,
+        "test:" + str(uuid4()),
+        current_admin.email,
+        *message(
+            "Email delivery test",
+            ["This test was requested from the Pholar Natural administration panel."],
+        ),
+    )
+    db.commit()
+    return {"queued": True}

@@ -5,7 +5,7 @@ from datetime import date
 from fastapi import APIRouter, Body, Depends, status
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_db, get_current_admin
+from app.api.dependencies import get_db, get_current_admin, get_payment_gateway
 from app.models.admin import AdminUser
 from app.schemas.booking import (
     AdminBookingResponse,
@@ -18,6 +18,7 @@ from app.services import booking_service
 router = APIRouter()
 
 # ---- BOOKINGS ----
+
 
 @router.get("/", response_model=List[AdminBookingResponse])
 def list_bookings(
@@ -45,16 +46,25 @@ def confirm_booking(
 def admin_cancel_booking(
     booking_id: UUID,
     body: Optional[BookingCancelRequest] = Body(default=None),
+    payment_gateway=Depends(get_payment_gateway),
     db: Session = Depends(get_db),
     current_admin: AdminUser = Depends(get_current_admin),
 ):
     """Cancel a booking with an optional reason."""
     reason = body.cancellation_reason if body else None
-    booking_service.cancel_booking(db, booking_id, reason)
-    return {"ok": True}
+    booking, refunded, message = booking_service.cancel_booking(
+        db, booking_id, reason, payment_gateway, admin=True
+    )
+    return {
+        "ok": True,
+        "status": booking.status,
+        "refunded": refunded,
+        "refund_policy_message": message,
+    }
 
 
 # ---- BLOCKED DATES ----
+
 
 @router.get("/blocked-dates", response_model=List[BlockedDateResponse])
 def list_blocked_dates_admin(
@@ -65,7 +75,11 @@ def list_blocked_dates_admin(
     return booking_service.get_blocked_dates(db)
 
 
-@router.post("/blocked-dates", response_model=BlockedDateResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/blocked-dates",
+    response_model=BlockedDateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def block_a_date(
     block_in: BlockedDateCreate,
     db: Session = Depends(get_db),

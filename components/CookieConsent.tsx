@@ -1,8 +1,10 @@
 'use client'
 
+import { useReducedMotion } from '@/lib/use-reduced-motion'
+
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import { Cookie, X } from 'lucide-react'
 import { useHydrated } from '@/lib/use-hydrated'
 
@@ -90,11 +92,17 @@ export default function CookieConsent() {
             className="fixed inset-x-0 bottom-0 z-[55] border-t border-outline-variant glass-effect"
           >
             <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-5 md:flex-row md:items-center md:px-16">
-              <Cookie className="hidden h-6 w-6 shrink-0 text-secondary md:block" aria-hidden="true" />
+              <Cookie
+                className="hidden h-6 w-6 shrink-0 text-secondary md:block"
+                aria-hidden="true"
+              />
               <p className="font-body-md text-body-md flex-1 text-on-surface-variant">
                 We use cookies to keep your cart working, understand how the site is used, and
                 improve your experience. Read our{' '}
-                <Link href="/privacy-policy" className="font-semibold text-primary underline underline-offset-2">
+                <Link
+                  href="/privacy-policy"
+                  className="font-semibold text-primary underline underline-offset-2"
+                >
                   Privacy Policy
                 </Link>
                 .
@@ -146,7 +154,10 @@ export default function CookieConsent() {
               className="w-full max-w-lg rounded-2xl bg-surface-container-lowest p-6 shadow-2xl"
             >
               <div className="mb-4 flex items-start justify-between gap-4">
-                <h2 id="cookie-prefs-title" className="font-headline-md text-headline-md text-primary">
+                <h2
+                  id="cookie-prefs-title"
+                  className="font-headline-md text-headline-md text-primary"
+                >
                   Cookie preferences
                 </h2>
                 <button
@@ -236,7 +247,11 @@ function ToggleRow({
       <div className="flex-1">
         <label htmlFor={id} className="font-body-md text-body-md font-semibold text-on-surface">
           {title}
-          {locked && <span className="ml-2 font-label-sm text-[11px] uppercase text-on-surface-variant">Always on</span>}
+          {locked && (
+            <span className="ml-2 font-label-sm text-[11px] uppercase text-on-surface-variant">
+              Always on
+            </span>
+          )}
         </label>
         <p className="font-body-md text-[13px] text-on-surface-variant">{description}</p>
       </div>

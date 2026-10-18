@@ -1,8 +1,6 @@
 import { apiClient } from './client'
 
-const BASE = (
-  process.env.NEXT_PUBLIC_API_URL ?? 'https://api.pholarnatural.com'
-).replace(/\/$/, '')
+const BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'https://api.pholarnatural.com').replace(/\/$/, '')
 
 const TOKEN_KEY = 'pholar_admin_token'
 
@@ -28,16 +26,14 @@ export async function adminLogin(email: string, password: string): Promise<strin
   })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    throw new Error(
-      typeof data?.detail === 'string' ? data.detail : `HTTP ${res.status}`,
-    )
+    throw new Error(typeof data?.detail === 'string' ? data.detail : `HTTP ${res.status}`)
   }
   const data = await res.json()
   return data.access_token as string
 }
 
 export async function adminLogout(): Promise<void> {
-  await apiClient('/api/v1/admin/logout', { method: 'POST' }).catch(() => {})
+  await apiClient('/api/v1/admin/logout', { method: 'POST', auth: true }).catch(() => {})
 }
 
 export async function adminRegister(

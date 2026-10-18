@@ -17,10 +17,7 @@ export const metadata: Metadata = {
 }
 
 export default async function BookPage() {
-  const [services, blockedDates] = await Promise.all([
-    getServices().catch(() => [] as import('@/lib/types').Service[]),
-    getBlockedDates().catch(() => [] as string[]),
-  ])
+  const [services, blockedDates] = await Promise.all([getServices(), getBlockedDates()])
 
   return (
     /*

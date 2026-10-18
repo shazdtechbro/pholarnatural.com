@@ -1,0 +1,43 @@
+{
+  "checks": [
+    {
+      "route": "/admin",
+      "title": "Dashboard",
+      "width": 320
+    },
+    {
+      "route": "/admin/products",
+      "title": "Products",
+      "width": 320
+    },
+    {
+      "route": "/admin/services",
+      "title": "Services",
+      "width": 320
+    },
+    {
+      "route": "/admin/bookings",
+      "title": "Bookings",
+      "width": 320
+    },
+    {
+      "route": "/admin/orders",
+      "title": "Orders",
+      "width": 320
+    },
+    {
+      "route": "/admin/discounts",
+      "title": "Discounts",
+      "width": 320
+    },
+    {
+      "route": "/admin/settings",
+      "title": "Settings",
+      "width": 320
+    },
+    {
+      "check": "Day/week calendar navigation works"
+    }
+  ],
+  "errors": []
+}

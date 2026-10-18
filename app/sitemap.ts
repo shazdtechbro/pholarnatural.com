@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { SITE_URL } from '@/lib/config'
-import { getProductSlugs } from '@/lib/data'
+import { getProductSlugs } from '@/lib/api/products'
 
 /**
  * Sitemap (doc §1.1.2).
@@ -9,10 +9,14 @@ import { getProductSlugs } from '@/lib/data'
  * confirmation screens are deliberately excluded — they are either private or transactional and
  * are already marked `noindex`. Listing them here would contradict that.
  */
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const lastModified = new Date()
 
-  const staticRoutes: { path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency'] }[] = [
+  const staticRoutes: {
+    path: string
+    priority: number
+    changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency']
+  }[] = [
     { path: '', priority: 1, changeFrequency: 'weekly' },
     { path: '/shop', priority: 0.9, changeFrequency: 'weekly' },
     { path: '/services', priority: 0.9, changeFrequency: 'monthly' },
@@ -33,7 +37,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: r.changeFrequency,
       priority: r.priority,
     })),
-    ...getProductSlugs().map((slug) => ({
+    ...(await getProductSlugs()).map((slug) => ({
       url: `${SITE_URL}/shop/${slug}`,
       lastModified,
       changeFrequency: 'weekly' as const,

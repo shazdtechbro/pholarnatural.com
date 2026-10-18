@@ -1,6 +1,8 @@
 'use client'
 
-import { motion, useMotionValue, useSpring, useTransform, useReducedMotion } from 'motion/react'
+import { useReducedMotion } from '@/lib/use-reduced-motion'
+
+import { motion, useMotionValue, useSpring, useTransform } from 'motion/react'
 import type { ReactNode } from 'react'
 
 interface TiltCardProps {

@@ -42,6 +42,8 @@ export default function ShopBrowser({
     const sorted = [...filtered]
     if (sort === 'price-asc') sorted.sort((a, b) => lowestPriceCents(a) - lowestPriceCents(b))
     if (sort === 'price-desc') sorted.sort((a, b) => lowestPriceCents(b) - lowestPriceCents(a))
+    if (sort === 'newest')
+      sorted.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
     if (sort === 'name-asc') sorted.sort((a, b) => a.name.localeCompare(b.name))
     return sorted
   }, [products, query, category, sort])
@@ -61,6 +63,7 @@ export default function ShopBrowser({
           <SearchBar value={query} onChange={setQuery} />
         </div>
         <ProductFilters
+          categories={['All Products', ...new Set(products.map((p) => p.category))]}
           category={category}
           onCategoryChange={setCategory}
           sort={sort}
@@ -73,13 +76,16 @@ export default function ShopBrowser({
         is not a silent, purely visual event (doc §1.1.5).
       */}
       <p aria-live="polite" className="mb-6 font-body-md text-body-md text-on-surface-variant">
-        Showing {visible.length} of {products.length} {products.length === 1 ? 'product' : 'products'}
+        Showing {visible.length} of {products.length}{' '}
+        {products.length === 1 ? 'product' : 'products'}
       </p>
 
       {visible.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-outline-variant py-20 text-center">
           <SearchX className="mx-auto mb-4 h-10 w-10 text-outline" aria-hidden="true" />
-          <h2 className="mb-2 font-headline-md text-headline-md text-primary">No products match your search</h2>
+          <h2 className="mb-2 font-headline-md text-headline-md text-primary">
+            No products match your search
+          </h2>
           <p className="mb-6 font-body-md text-body-md text-on-surface-variant">
             Try a different term, or clear the filters to see everything.
           </p>
@@ -96,7 +102,11 @@ export default function ShopBrowser({
           <ul className="grid grid-cols-1 gap-8 sm:grid-cols-2">
             {visible.map((product, i) => (
               <RevealOnScroll as="li" key={product.id} index={i} className="h-full">
-                <ProductCard product={product} imageUrl={cardImages[product.slug]} priority={i < 2} />
+                <ProductCard
+                  product={product}
+                  imageUrl={cardImages[product.slug]}
+                  priority={i < 2}
+                />
               </RevealOnScroll>
             ))}
           </ul>

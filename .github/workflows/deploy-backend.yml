@@ -5,21 +5,69 @@ on:
     branches: [main]
     paths:
       - 'server/**'
+      - '.github/workflows/deploy-backend.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-backend
+  cancel-in-progress: false
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: pholar_test
+          POSTGRES_PASSWORD: ci-only-ephemeral-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pholar_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_POSTGRES_URL: postgresql://postgres:ci-only-ephemeral-password@127.0.0.1:5432/pholar_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install -r requirements.txt
+        working-directory: server
+      - run: python -m pytest
+        working-directory: server
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     steps:
+      - name: Require a verified VPS host key
+        env:
+          VPS_SSH_FINGERPRINT: ${{ secrets.VPS_SSH_FINGERPRINT }}
+        run: |
+          if [ -z "$VPS_SSH_FINGERPRINT" ]; then
+            echo "::error::Set VPS_SSH_FINGERPRINT from the trusted VPS console before deploying."
+            exit 1
+          fi
       - name: SSH and deploy
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_SSH_PORT }}
+          fingerprint: ${{ secrets.VPS_SSH_FINGERPRINT }}
           script: |
+            set -eu
             cd ~/pholarnatural.com/server
-            git pull origin main
-            docker compose build
-            docker compose up -d
-            docker compose exec -T api alembic upgrade head
+            git pull --ff-only origin main
+            docker compose build api
+            docker compose run --rm --no-deps api alembic upgrade head
+            docker compose up -d api
+            for attempt in $(seq 1 20); do
+              if curl --fail --silent http://127.0.0.1:8000/health > /dev/null; then exit 0; fi
+              sleep 2
+            done
+            exit 1

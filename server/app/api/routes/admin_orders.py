@@ -4,7 +4,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_db, get_current_admin
+from app.api.dependencies import get_db, get_current_admin, get_payment_gateway
 from app.models.admin import AdminUser
 from app.schemas.order import AdminOrderResponse, OrderStatusUpdate
 from app.services import order_service
@@ -36,9 +36,10 @@ def get_order_detail(
 def update_order_status(
     order_id: UUID,
     status_in: OrderStatusUpdate,
+    payment_gateway=Depends(get_payment_gateway),
     db: Session = Depends(get_db),
     current_admin: AdminUser = Depends(get_current_admin),
 ):
     """Advance an order through the fulfilment pipeline."""
-    order_service.update_order_status(db, order_id, status_in)
-    return {"ok": True}
+    order = order_service.update_order_status(db, order_id, status_in, payment_gateway)
+    return {"ok": True, "status": order.status}

@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   CalendarDays,
-  Check,
   Ban,
   CalendarOff,
   ChevronLeft,
@@ -26,7 +25,6 @@ import { Field, TextareaField } from '@/components/FormField'
 import { useToast } from '@/context/ToastContext'
 import {
   listAdminBookings,
-  confirmBooking,
   cancelBookingAdmin,
   listAdminBlockedDates,
   blockDate,
@@ -38,8 +36,18 @@ import { formatDateShort, formatDateLong, formatTime, formatPrice, toISODate } f
 import { OPEN_WEEKDAYS } from '@/lib/config'
 
 const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ] as const
 
 type Filter = 'all' | 'pending' | 'confirmed' | 'completed' | 'cancelled'
@@ -50,6 +58,7 @@ export default function AdminBookingsPage() {
   const [blocked, setBlocked] = useState<AdminBlockedDate[]>([])
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<'calendar' | 'list'>('calendar')
+  const [period, setPeriod] = useState<'month' | 'week' | 'day'>('month')
   const [filter, setFilter] = useState<Filter>('all')
   const [cancelling, setCancelling] = useState<AdminBooking | null>(null)
   const [blockingOpen, setBlockingOpen] = useState(false)
@@ -60,7 +69,7 @@ export default function AdminBookingsPage() {
     d.setHours(0, 0, 0, 0)
     return d
   }, [])
-  const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1))
+  const [cursor, setCursor] = useState(() => new Date(today))
 
   useEffect(() => {
     Promise.all([listAdminBookings(), listAdminBlockedDates()])
@@ -75,10 +84,16 @@ export default function AdminBookingsPage() {
   const visible = useMemo(
     () =>
       [...bookings]
-        .filter((b) => filter === 'all' || b.status === filter)
+        .filter(
+          (b) =>
+            filter === 'all' ||
+            b.status === filter ||
+            (filter === 'cancelled' && ['refunded', 'refund_pending'].includes(b.status)),
+        )
         .sort(
           (a, b) =>
-            b.booking_date.localeCompare(a.booking_date) || a.start_time.localeCompare(b.start_time),
+            b.booking_date.localeCompare(a.booking_date) ||
+            a.start_time.localeCompare(b.start_time),
         ),
     [bookings, filter],
   )
@@ -86,7 +101,10 @@ export default function AdminBookingsPage() {
   const byDate = useMemo(() => {
     const map = new Map<string, AdminBooking[]>()
     for (const b of bookings) {
-      if (b.status === 'cancelled') continue
+      if (
+        ['cancelled', 'refunded', 'refund_pending', 'payment_failed', 'expired'].includes(b.status)
+      )
+        continue
       const list = map.get(b.booking_date) ?? []
       list.push(b)
       map.set(b.booking_date, list)
@@ -103,26 +121,33 @@ export default function AdminBookingsPage() {
   const daysInMonth = new Date(year, month + 1, 0).getDate()
 
   const cells: (string | null)[] = []
-  for (let i = 0; i < firstWeekday; i++) cells.push(null)
-  for (let d = 1; d <= daysInMonth; d++) cells.push(toISODate(new Date(year, month, d)))
-
-  async function handleConfirm(id: string) {
-    try {
-      await confirmBooking(id)
-      setBookings((bs) => bs.map((b) => (b.id === id ? { ...b, status: 'confirmed' } : b)))
-      toast('Booking confirmed')
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to confirm', 'error')
-    }
+  if (period === 'month') {
+    for (let i = 0; i < firstWeekday; i++) cells.push(null)
+    for (let d = 1; d <= daysInMonth; d++) cells.push(toISODate(new Date(year, month, d)))
+  } else {
+    const start = new Date(cursor)
+    if (period === 'week') start.setDate(start.getDate() - start.getDay())
+    for (let i = 0; i < (period === 'week' ? 7 : 1); i++)
+      cells.push(toISODate(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)))
   }
+  const shift = (direction: number) =>
+    setCursor(
+      new Date(
+        year,
+        month + (period === 'month' ? direction : 0),
+        period === 'month' ? 1 : cursor.getDate() + direction * (period === 'week' ? 7 : 1),
+      ),
+    )
 
   async function handleCancel(id: string, reason: string) {
     try {
-      await cancelBookingAdmin(id, reason)
+      const response = await cancelBookingAdmin(id, reason)
       setBookings((bs) =>
-        bs.map((b) => (b.id === id ? { ...b, status: 'cancelled', cancellation_reason: reason } : b)),
+        bs.map((b) =>
+          b.id === id ? { ...b, status: response.status, cancellation_reason: reason } : b,
+        ),
       )
-      toast('Booking cancelled', 'info')
+      toast(response.refund_policy_message || 'Booking cancelled', 'info')
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Failed to cancel', 'error')
     }
@@ -190,22 +215,35 @@ export default function AdminBookingsPage() {
 
       {view === 'calendar' ? (
         <section className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 md:p-6">
+          <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Calendar period">
+            {(['month', 'week', 'day'] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={period === value}
+                onClick={() => setPeriod(value)}
+                className={`rounded-full border px-4 py-2 capitalize ${period === value ? 'bg-primary text-white' : ''}`}
+              >
+                {value}
+              </button>
+            ))}
+          </div>
           <div className="mb-4 flex items-center justify-between">
             <button
               type="button"
-              onClick={() => setCursor(new Date(year, month - 1, 1))}
-              aria-label="Previous month"
+              onClick={() => shift(-1)}
+              aria-label={`Previous ${period}`}
               className="flex h-10 w-10 items-center justify-center rounded-full text-primary hover:bg-surface-container-high"
             >
               <ChevronLeft className="h-5 w-5" aria-hidden="true" />
             </button>
             <h2 aria-live="polite" className="font-headline-md text-headline-md text-primary">
-              {MONTHS[month]} {year}
+              {period === 'month' ? `${MONTHS[month]} ${year}` : formatDateLong(toISODate(cursor))}
             </h2>
             <button
               type="button"
-              onClick={() => setCursor(new Date(year, month + 1, 1))}
-              aria-label="Next month"
+              onClick={() => shift(1)}
+              aria-label={`Next ${period}`}
               className="flex h-10 w-10 items-center justify-center rounded-full text-primary hover:bg-surface-container-high"
             >
               <ChevronRight className="h-5 w-5" aria-hidden="true" />
@@ -213,8 +251,15 @@ export default function AdminBookingsPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <div className="grid min-w-[44rem] grid-cols-7 gap-2">
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+            <div
+              className={
+                period === 'day' ? 'grid grid-cols-1 gap-2' : 'grid min-w-[44rem] grid-cols-7 gap-2'
+              }
+            >
+              {(period === 'day'
+                ? [cursor.toLocaleDateString('en-CA', { weekday: 'long' })]
+                : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+              ).map((d) => (
                 <div
                   key={d}
                   className="pb-2 text-center font-label-sm text-label-sm uppercase text-on-surface-variant"
@@ -227,7 +272,7 @@ export default function AdminBookingsPage() {
                 if (!iso) return <div key={`pad-${i}`} />
                 const day = Number(iso.slice(-2))
                 const dayBookings = byDate.get(iso) ?? []
-                const weekday = new Date(year, month, day).getDay()
+                const weekday = new Date(iso + 'T12:00:00').getDay()
                 const isClosed = !(OPEN_WEEKDAYS as readonly number[]).includes(weekday)
                 const isBlocked = blockedSet.has(iso)
                 const isToday = iso === toISODate(today)
@@ -244,12 +289,18 @@ export default function AdminBookingsPage() {
                     } ${isToday ? 'ring-2 ring-primary' : ''}`}
                   >
                     <p className="mb-1 flex items-center justify-between font-label-sm text-label-sm">
-                      <span className={isClosed || isBlocked ? 'text-outline' : 'text-on-surface'}>{day}</span>
-                      {isToday && <span className="text-[10px] font-bold uppercase text-primary">Today</span>}
+                      <span className={isClosed || isBlocked ? 'text-outline' : 'text-on-surface'}>
+                        {day}
+                      </span>
+                      {isToday && (
+                        <span className="text-[10px] font-bold uppercase text-primary">Today</span>
+                      )}
                     </p>
 
                     {isBlocked && (
-                      <p className="font-label-sm text-[10px] uppercase text-on-error-container">Closed</p>
+                      <p className="font-label-sm text-[10px] uppercase text-on-error-container">
+                        Closed
+                      </p>
                     )}
 
                     <ul className="space-y-1">
@@ -297,7 +348,11 @@ export default function AdminBookingsPage() {
         </section>
       ) : (
         <>
-          <div role="radiogroup" aria-label="Filter by status" className="mb-6 flex flex-wrap gap-2">
+          <div
+            role="radiogroup"
+            aria-label="Filter by status"
+            className="mb-6 flex flex-wrap gap-2"
+          >
             {(['all', 'pending', 'confirmed', 'completed', 'cancelled'] as const).map((f) => (
               <button
                 key={f}
@@ -317,7 +372,11 @@ export default function AdminBookingsPage() {
           </div>
 
           {visible.length === 0 ? (
-            <EmptyState icon={CalendarDays} title="No bookings" message="Nothing matches this filter." />
+            <EmptyState
+              icon={CalendarDays}
+              title="No bookings"
+              message="Nothing matches this filter."
+            />
           ) : (
             <TableWrap caption="All bookings">
               <thead>
@@ -361,16 +420,9 @@ export default function AdminBookingsPage() {
                     <Td>
                       <div className="flex justify-end gap-2">
                         {b.status === 'pending' && (
-                          <button
-                            type="button"
-                            onClick={() => handleConfirm(b.id)}
-                            aria-label={`Confirm booking ${b.reference}`}
-                            className="rounded-full p-2 text-on-surface-variant transition-colors hover:bg-primary/10 hover:text-primary"
-                          >
-                            <Check className="h-4 w-4" aria-hidden="true" />
-                          </button>
+                          <span className="text-[12px]">Awaiting deposit</span>
                         )}
-                        {b.status !== 'cancelled' && b.status !== 'completed' && (
+                        {['pending', 'confirmed'].includes(b.status) && (
                           <button
                             type="button"
                             onClick={() => setCancelling(b)}
@@ -402,10 +454,7 @@ export default function AdminBookingsPage() {
       )}
 
       {blockingOpen && (
-        <BlockDateDialog
-          onClose={() => setBlockingOpen(false)}
-          onConfirm={handleBlockDate}
-        />
+        <BlockDateDialog onClose={() => setBlockingOpen(false)} onConfirm={handleBlockDate} />
       )}
     </>
   )
@@ -476,7 +525,13 @@ function BlockDateDialog({
         }}
         className="space-y-4"
       >
-        <Field label="Date" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+        <Field
+          label="Date"
+          type="date"
+          required
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+        />
         <Field
           label="Reason"
           value={reason}

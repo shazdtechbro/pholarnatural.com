@@ -9,6 +9,8 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { usePathname } from 'next/navigation'
+import { getProducts } from '@/lib/api/products'
 import type { CartItem, Product, ProductVariant } from '@/lib/types'
 import { useHydrated } from '@/lib/use-hydrated'
 
@@ -62,6 +64,7 @@ function parseStored(raw: string | null): CartItem[] {
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname()
   /*
    * Seeded lazily from localStorage on the first client render. On the server `window` is
    * undefined and this starts empty, which is what the server HTML reflects.
@@ -90,7 +93,52 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('storage', onStorage)
   }, [])
 
+  useEffect(() => {
+    if (pathname.startsWith('/admin')) return
+    let stopped = false
+    async function sync() {
+      try {
+        const products = await getProducts()
+        if (stopped) return
+        const variants = new Map(
+          products.flatMap((product) =>
+            product.variants.map((variant) => [variant.id, { product, variant }] as const),
+          ),
+        )
+        setItems((previous) =>
+          previous.flatMap((item) => {
+            const current = variants.get(item.variant_id)
+            if (!current || current.variant.stock_count <= 0) return []
+            const { product, variant } = current
+            return [
+              {
+                ...item,
+                product_name: product.name,
+                product_slug: product.slug,
+                variant_label: variant.weight_label,
+                unit_price_cents: variant.price_cents,
+                stock_count: variant.stock_count,
+                quantity: Math.min(item.quantity, variant.stock_count),
+                image_url: product.images[0]?.url ?? '',
+                image_alt: product.images[0]?.alt ?? product.name,
+              },
+            ]
+          }),
+        )
+      } catch {
+        /* Keep the saved cart during a temporary API outage. */
+      }
+    }
+    void sync()
+    window.addEventListener('focus', sync)
+    return () => {
+      stopped = true
+      window.removeEventListener('focus', sync)
+    }
+  }, [pathname])
+
   const addItem = useCallback((product: Product, variant: ProductVariant, quantity = 1) => {
+    if (!variant.is_active || variant.stock_count <= 0 || variant.price_cents <= 0) return
     setItems((prev) => {
       const key = keyFor(product.id, variant.id)
       const existing = prev.find((i) => i.key === key)

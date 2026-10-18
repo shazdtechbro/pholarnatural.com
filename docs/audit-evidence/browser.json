@@ -1,0 +1,257 @@
+{
+  "results": [
+    {
+      "route": "/",
+      "status": 200,
+      "landed": "/",
+      "title": "Pholar Natural | Nature's Finest for Your Crown | Pholar Natural"
+    },
+    {
+      "route": "/shop",
+      "status": 200,
+      "landed": "/shop",
+      "title": "Shop | Pholar Natural"
+    },
+    {
+      "route": "/shop/restorative-hair-oil",
+      "status": 200,
+      "landed": "/shop/restorative-hair-oil",
+      "title": "Restorative Hair Oil | Pholar Natural"
+    },
+    {
+      "route": "/services",
+      "status": 200,
+      "landed": "/services",
+      "title": "Services | Pholar Natural"
+    },
+    {
+      "route": "/book",
+      "status": 200,
+      "landed": "/book",
+      "title": "Book an Appointment | Pholar Natural"
+    },
+    {
+      "route": "/cart",
+      "status": 200,
+      "landed": "/cart",
+      "title": "Pholar Natural | Nature's Finest for Your Crown"
+    },
+    {
+      "route": "/checkout",
+      "status": 200,
+      "landed": "/checkout",
+      "title": "Pholar Natural | Nature's Finest for Your Crown"
+    },
+    {
+      "route": "/checkout/success",
+      "status": 200,
+      "landed": "/checkout/success",
+      "title": "Pholar Natural | Nature's Finest for Your Crown"
+    },
+    {
+      "route": "/order-confirmation",
+      "status": 200,
+      "landed": "/order-confirmation",
+      "title": "Order Confirmation | Pholar Natural"
+    },
+    {
+      "route": "/book/confirmation",
+      "status": 200,
+      "landed": "/book/confirmation",
+      "title": "Booking Confirmed | Pholar Natural"
+    },
+    {
+      "route": "/about",
+      "status": 200,
+      "landed": "/about",
+      "title": "About | Pholar Natural"
+    },
+    {
+      "route": "/faq",
+      "status": 200,
+      "landed": "/faq",
+      "title": "FAQ | Pholar Natural"
+    },
+    {
+      "route": "/contact",
+      "status": 200,
+      "landed": "/contact",
+      "title": "Contact | Pholar Natural"
+    },
+    {
+      "route": "/shipping-policy",
+      "status": 200,
+      "landed": "/shipping-policy",
+      "title": "Shipping Policy | Pholar Natural"
+    },
+    {
+      "route": "/refund-policy",
+      "status": 200,
+      "landed": "/refund-policy",
+      "title": "Refund Policy | Pholar Natural"
+    },
+    {
+      "route": "/privacy-policy",
+      "status": 200,
+      "landed": "/privacy-policy",
+      "title": "Privacy Policy | Pholar Natural"
+    },
+    {
+      "route": "/terms-of-service",
+      "status": 200,
+      "landed": "/terms-of-service",
+      "title": "Terms of Service | Pholar Natural"
+    },
+    {
+      "route": "/admin",
+      "status": 200,
+      "landed": "/admin/login",
+      "title": "Admin | Pholar Natural"
+    },
+    {
+      "route": "/admin/login",
+      "status": 200,
+      "landed": "/admin/login",
+      "title": "Admin | Pholar Natural"
+    },
+    {
+      "route": "/admin/register",
+      "status": 200,
+      "landed": "/admin/register",
+      "title": "Admin | Pholar Natural"
+    },
+    {
+      "route": "/admin/products",
+      "status": 200,
+      "landed": "/admin/login",
+      "title": "Admin | Pholar Natural"
+    },
+    {
+      "route": "/admin/services",
+      "status": 200,
+      "landed": "/admin/login",
+      "title": "Admin | Pholar Natural"
+    },
+    {
+      "route": "/admin/bookings",
+      "status": 200,
+      "landed": "/admin/login",
+      "title": "Admin | Pholar Natural"
+    },
+    {
+      "route": "/admin/orders",
+      "status": 200,
+      "landed": "/admin/login",
+      "title": "Admin | Pholar Natural"
+    },
+    {
+      "route": "/admin/discounts",
+      "status": 200,
+      "landed": "/admin/login",
+      "title": "Admin | Pholar Natural"
+    },
+    {
+      "route": "/admin/settings",
+      "status": 200,
+      "landed": "/admin/login",
+      "title": "Admin | Pholar Natural"
+    },
+    {
+      "route": "/missing-audit-page",
+      "status": 404,
+      "landed": "/missing-audit-page",
+      "title": "Pholar Natural | Nature's Finest for Your Crown"
+    },
+    {
+      "probe": "Homepage add to cart survives reload",
+      "before": [
+        {
+          "variant_id": "var_oil_30",
+          "quantity": 1
+        }
+      ],
+      "after": []
+    },
+    {
+      "probe": "320px width",
+      "route": "/",
+      "viewport": 320,
+      "document": 324,
+      "body": 324
+    },
+    {
+      "probe": "320px width",
+      "route": "/shop",
+      "viewport": 320,
+      "document": 320,
+      "body": 320
+    },
+    {
+      "probe": "320px width",
+      "route": "/services",
+      "viewport": 320,
+      "document": 494,
+      "body": 320
+    },
+    {
+      "probe": "320px width",
+      "route": "/book",
+      "viewport": 320,
+      "document": 320,
+      "body": 320
+    },
+    {
+      "probe": "320px width",
+      "route": "/cart",
+      "viewport": 320,
+      "document": 320,
+      "body": 320
+    },
+    {
+      "probe": "320px width",
+      "route": "/checkout",
+      "viewport": 320,
+      "document": 361,
+      "body": 361
+    },
+    {
+      "probe": "320px width",
+      "route": "/faq",
+      "viewport": 320,
+      "document": 320,
+      "body": 320
+    },
+    {
+      "probe": "320px width",
+      "route": "/contact",
+      "viewport": 320,
+      "document": 320,
+      "body": 320
+    },
+    {
+      "probe": "320px width",
+      "route": "/admin/login",
+      "viewport": 320,
+      "document": 320,
+      "body": 320
+    }
+  ],
+  "errors": [
+    {
+      "route": "/",
+      "message": "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+    },
+    {
+      "route": "/about",
+      "message": "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+    },
+    {
+      "route": "/",
+      "message": "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+    },
+    {
+      "route": "/",
+      "message": "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+    }
+  ]
+}

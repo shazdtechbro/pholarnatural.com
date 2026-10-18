@@ -22,6 +22,9 @@ interface RawVariant {
 }
 
 interface RawProduct {
+  seo_title?: string | null
+  seo_description?: string | null
+  is_bestseller?: boolean
   id: string
   name: string
   slug: string
@@ -44,32 +47,36 @@ function normalise(raw: RawProduct): Product {
     tagline: raw.tagline ?? '',
     category: (raw.category ?? 'Hair Oil') as Product['category'],
     updated_at: raw.updated_at ?? raw.created_at,
-    images: raw.images.map((img) => ({
-      id: img.id,
-      product_id: raw.id,          // backend omits product_id on the image object
-      url: img.url,
-      alt: img.alt ?? '',
-      sort_order: img.sort_order ?? 0,
-    })),
-    variants: raw.variants.map((v) => ({
-      id: v.id,
-      product_id: raw.id,
-      weight_grams: v.weight_grams ?? 0,
-      weight_label: v.weight_label ?? '',
-      price_cents: v.price_cents,
-      stock_count: v.stock_count,
-      sku: v.sku ?? '',
-      is_active: v.is_active,
-    })),
+    images: (raw.images.length
+      ? raw.images
+      : [{ id: 'placeholder', url: '/images/hero/woman-braids.webp', alt: raw.name, sort_order: 0 }]
+    )
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      .map((img) => ({
+        id: img.id,
+        product_id: raw.id, // backend omits product_id on the image object
+        url: img.url,
+        alt: img.alt ?? '',
+        sort_order: img.sort_order ?? 0,
+      })),
+    variants: raw.variants
+      .filter((v) => v.is_active)
+      .map((v) => ({
+        id: v.id,
+        product_id: raw.id,
+        weight_grams: v.weight_grams ?? 0,
+        weight_label: v.weight_label ?? '',
+        price_cents: v.price_cents,
+        stock_count: v.stock_count,
+        sku: v.sku ?? '',
+        is_active: v.is_active,
+      })),
   }
 }
 
 // ─── Public functions ─────────────────────────────────────────────────────────
 
-export async function getProducts(opts?: {
-  category?: string
-  q?: string
-}): Promise<Product[]> {
+export async function getProducts(opts?: { category?: string; q?: string }): Promise<Product[]> {
   const params = new URLSearchParams()
   if (opts?.category && opts.category !== 'All Products') {
     params.set('category', opts.category)
@@ -79,18 +86,15 @@ export async function getProducts(opts?: {
   }
 
   const qs = params.toString()
-  const raw = await apiClient<RawProduct[]>(
-    `/api/v1/products/${qs ? `?${qs}` : ''}`,
-    { next: { revalidate: 300 } },
-  )
+  const raw = await apiClient<RawProduct[]>(`/api/v1/products/${qs ? `?${qs}` : ''}`, {
+    next: { revalidate: 300 },
+  })
   return raw.map(normalise)
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
   try {
-    const raw = await apiClient<RawProduct>(`/api/v1/products/${slug}`, {
-      next: { revalidate: 300 },
-    })
+    const raw = await apiClient<RawProduct>(`/api/v1/products/${slug}`, {})
     return normalise(raw)
   } catch (e) {
     if (e instanceof ApiError && e.isNotFound) return null

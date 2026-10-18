@@ -10,7 +10,7 @@
 /** Money is always integer cents, never a float. Currency is CAD everywhere (doc §7). */
 export type Cents = number
 
-export type ProductCategory = 'Hair Oil' | 'Shampoo'
+export type ProductCategory = string
 
 export interface ProductImage {
   id: string
@@ -34,6 +34,8 @@ export interface ProductVariant {
 }
 
 export interface Product {
+  seo_title?: string | null
+  seo_description?: string | null
   id: string
   name: string
   slug: string

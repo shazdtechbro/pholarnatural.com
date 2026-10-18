@@ -1,3 +1,4 @@
+import { serializeJsonLd } from '@/lib/json-ld'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Clock, ArrowRight, CalendarDays } from 'lucide-react'
@@ -21,7 +22,7 @@ export const metadata: Metadata = {
 }
 
 export default async function ServicesPage() {
-  const services = await getServices().catch(() => [] as import('@/lib/types').Service[])
+  const services = await getServices()
 
   return (
     <div className="mx-auto max-w-7xl px-5 py-16 md:px-16">
@@ -29,7 +30,7 @@ export default async function ServicesPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(
+          __html: serializeJsonLd(
             services.map((s) => ({
               '@context': 'https://schema.org',
               '@type': 'Service',
@@ -84,7 +85,9 @@ export default async function ServicesPage() {
 
               <div className="flex flex-1 flex-col p-6">
                 <h2 className="font-headline-md text-headline-md text-primary">{service.name}</h2>
-                <p className="mt-2 font-body-md text-body-md text-on-surface-variant">{service.description}</p>
+                <p className="mt-2 font-body-md text-body-md text-on-surface-variant">
+                  {service.description}
+                </p>
 
                 <dl className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
                   <div className="flex items-center gap-1.5">
@@ -147,8 +150,8 @@ export default async function ServicesPage() {
                   </h4>
                   <p>
                     Come with your hair detangled and free of heavy product. Allow{' '}
-                    {formatDuration(s.duration_minutes)} in the chair, and arrive five minutes early so
-                    we can start on time.
+                    {formatDuration(s.duration_minutes)} in the chair, and arrive five minutes early
+                    so we can start on time.
                   </p>
                 </div>
                 <Link
@@ -169,24 +172,37 @@ export default async function ServicesPage() {
         <h2 className="mb-6 font-headline-lg text-headline-lg-mobile text-primary md:text-headline-lg">
           Pricing at a glance
         </h2>
-        <div className="overflow-x-auto rounded-2xl border border-outline-variant">
+        <div className="relative overflow-x-auto rounded-2xl border border-outline-variant">
           <table className="w-full min-w-[36rem] border-collapse bg-surface-container-lowest text-left">
             <caption className="sr-only-live">
               Service prices and durations. All prices in {CURRENCY}.
             </caption>
             <thead>
               <tr className="border-b border-outline-variant bg-surface-container-low">
-                <th scope="col" className="p-4 font-label-sm text-label-sm uppercase text-primary">Service</th>
-                <th scope="col" className="p-4 font-label-sm text-label-sm uppercase text-primary">Duration</th>
-                <th scope="col" className="p-4 font-label-sm text-label-sm uppercase text-primary">Price</th>
-                <th scope="col" className="p-4 font-label-sm text-label-sm uppercase text-primary">Deposit</th>
-                <th scope="col" className="p-4"><span className="sr-only-live">Book</span></th>
+                <th scope="col" className="p-4 font-label-sm text-label-sm uppercase text-primary">
+                  Service
+                </th>
+                <th scope="col" className="p-4 font-label-sm text-label-sm uppercase text-primary">
+                  Duration
+                </th>
+                <th scope="col" className="p-4 font-label-sm text-label-sm uppercase text-primary">
+                  Price
+                </th>
+                <th scope="col" className="p-4 font-label-sm text-label-sm uppercase text-primary">
+                  Deposit
+                </th>
+                <th scope="col" className="p-4">
+                  <span className="sr-only-live">Book</span>
+                </th>
               </tr>
             </thead>
             <tbody>
               {services.map((s) => (
                 <tr key={s.id} className="border-b border-outline-variant/60 last:border-0">
-                  <th scope="row" className="p-4 font-body-md text-body-md font-semibold text-on-surface">
+                  <th
+                    scope="row"
+                    className="p-4 font-body-md text-body-md font-semibold text-on-surface"
+                  >
                     {s.name}
                   </th>
                   <td className="p-4 font-body-md text-body-md text-on-surface-variant">

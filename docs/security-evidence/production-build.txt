@@ -1,0 +1,59 @@
+
+> pholar-natural@0.1.0 build
+> next build
+
+▲ Next.js 16.4.2 (Turbopack)
+✓ Running next.config.ts took 27ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 749ms
+  Running TypeScript ...
+  Finished TypeScript in 3.6s ...
+  Collecting page data using 4 workers ...
+  Generating static pages using 4 workers (0/32) ...
+  Generating static pages using 4 workers (8/32) 
+  Generating static pages using 4 workers (16/32) 
+  Generating static pages using 4 workers (24/32) 
+✓ Generating static pages using 4 workers (32/32) in 752ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ƒ /_not-found
+├ ƒ /about
+├ ƒ /admin
+├ ƒ /admin/bookings
+├ ƒ /admin/discounts
+├ ƒ /admin/login
+├ ƒ /admin/orders
+├ ƒ /admin/products
+├ ƒ /admin/register
+├ ƒ /admin/services
+├ ƒ /admin/settings
+├ ƒ /book
+├ ƒ /book/confirmation
+├ ƒ /cart
+├ ƒ /checkout
+├ ƒ /checkout/success
+├ ƒ /contact
+├ ƒ /faq
+├ ƒ /order-confirmation
+├ ƒ /privacy-policy
+├ ƒ /refund-policy
+├ ○ /robots.txt
+├ ƒ /services
+├ ƒ /shipping-policy
+├ ƒ /shop
+├ ƒ /shop/[slug]
+├ ƒ /sitemap.xml
+└ ƒ /terms-of-service
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+npm notice To update run: npm install -g npm@12.2.0
+npm notice

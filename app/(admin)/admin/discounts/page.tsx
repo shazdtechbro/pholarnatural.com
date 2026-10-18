@@ -33,7 +33,7 @@ export default function AdminDiscountsPage() {
   const [creating, setCreating] = useState(false)
   const [deleting, setDeleting] = useState<AdminDiscount | null>(null)
   const [saving, setSaving] = useState(false)
-  const [confirmLoading, setConfirmLoading] = useState(false)
+  const [, setConfirmLoading] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -244,7 +244,8 @@ function DiscountForm({
           discount_type: discount.discount_type,
           value: discount.value,
           max_uses: discount.max_uses !== null ? String(discount.max_uses) : '',
-          min_order_cents: discount.min_order_cents !== null ? String(discount.min_order_cents) : '',
+          min_order_cents:
+            discount.min_order_cents !== null ? String(discount.min_order_cents) : '',
           expires_at: discount.expires_at ? discount.expires_at.slice(0, 10) : '',
           is_active: discount.is_active,
         }

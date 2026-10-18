@@ -3,12 +3,14 @@ import { Clock, ArrowRight } from 'lucide-react'
 import ServiceImage from '@/components/ServiceImage'
 import TiltCard from '@/components/animations/TiltCard'
 import RevealOnScroll from '@/components/animations/RevealOnScroll'
-import { getServices, SERVICE_WIDE_IMAGE } from '@/lib/data'
+import { getServices } from '@/lib/api/services'
+import { getPublicSettings, featured } from '@/lib/api/settings'
 import { formatPrice, formatDuration } from '@/lib/format'
 
 /** Homepage services preview (doc §1.2.3) — icon, description, price, duration and a Book CTA per card. */
 export default async function Services() {
-  const services = await getServices()
+  const [catalogue, settings] = await Promise.all([getServices(), getPublicSettings()])
+  const services = featured(catalogue, settings.featured_service_ids)
 
   return (
     <section id="services" className="scroll-mt-24 py-16">
@@ -32,20 +34,25 @@ export default async function Services() {
                   <div className="relative aspect-[3/4] overflow-hidden">
                     <ServiceImage
                       slug={service.slug}
-                      src={SERVICE_WIDE_IMAGE[service.slug] ?? service.image_url}
+                      src={service.image_url}
                       alt={`${service.name} at Pholar Natural`}
                       variant="tall"
                       sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, (max-width: 1280px) 30vw, 24vw"
                       className="object-cover"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" aria-hidden="true" />
+                    <div
+                      className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent"
+                      aria-hidden="true"
+                    />
                     <h3 className="absolute inset-x-4 bottom-4 font-headline-md text-body-lg text-white">
                       {service.name}
                     </h3>
                   </div>
 
                   <div className="flex flex-1 flex-col p-4">
-                    <p className="mb-4 font-body-md text-[13px] text-on-surface-variant">{service.description}</p>
+                    <p className="mb-4 font-body-md text-[13px] text-on-surface-variant">
+                      {service.description}
+                    </p>
                     <div className="mb-4 mt-auto flex items-center justify-between gap-2">
                       <span className="font-body-md text-body-md font-bold text-primary">
                         {formatPrice(service.price_cents)}
@@ -76,7 +83,10 @@ export default async function Services() {
               className="group inline-flex items-center gap-2 font-label-sm text-label-sm text-primary"
             >
               View All Services
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+              <ArrowRight
+                className="h-4 w-4 transition-transform group-hover:translate-x-1"
+                aria-hidden="true"
+              />
             </Link>
           </div>
         </RevealOnScroll>

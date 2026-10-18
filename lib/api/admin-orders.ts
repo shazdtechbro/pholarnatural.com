@@ -27,6 +27,7 @@ export interface AdminOrder {
   subtotal_cents: number
   shipping_cents: number
   discount_cents: number
+  tax_cents: number
   total_cents: number
   status: string
   created_at: string
@@ -42,8 +43,8 @@ export function getAdminOrder(id: string): Promise<AdminOrder> {
   return apiClient<AdminOrder>(`/api/v1/admin/orders/${id}`, { auth: true })
 }
 
-export function updateOrderStatus(id: string, status: string): Promise<void> {
-  return apiClient<void>(`/api/v1/admin/orders/${id}/status`, {
+export function updateOrderStatus(id: string, status: string): Promise<{ status: string }> {
+  return apiClient<{ status: string }>(`/api/v1/admin/orders/${id}/status`, {
     method: 'PUT',
     body: { status },
     auth: true,

@@ -9,10 +9,16 @@ import { formatPrice } from '@/lib/format'
 import type { Product } from '@/lib/types'
 
 /** Below this many units we warn rather than simply saying "in stock" (doc §1.4). */
-const LOW_STOCK_THRESHOLD = 10
+const LOW_STOCK_THRESHOLD = 5
 
 /** Gallery, variant selector, stock indicator, quantity stepper and Add to Cart (doc §1.4). */
-export default function ProductDetail({ product }: { product: Product }) {
+function PurchasableDetail({
+  product,
+  lowStockThreshold,
+}: {
+  product: Product
+  lowStockThreshold: number
+}) {
   const activeVariants = product.variants.filter((v) => v.is_active)
   const firstInStock = activeVariants.find((v) => v.stock_count > 0) ?? activeVariants[0]
 
@@ -26,8 +32,8 @@ export default function ProductDetail({ product }: { product: Product }) {
   const groupId = useId()
   const qtyId = useId()
 
-  const outOfStock = variant.stock_count === 0
-  const lowStock = !outOfStock && variant.stock_count < LOW_STOCK_THRESHOLD
+  const outOfStock = variant.stock_count <= 0 || variant.price_cents <= 0
+  const lowStock = !outOfStock && variant.stock_count <= lowStockThreshold
   const maxQty = Math.max(1, variant.stock_count)
 
   /** Changing variant can invalidate the chosen quantity — clamp instead of failing at add-time. */
@@ -61,7 +67,9 @@ export default function ProductDetail({ product }: { product: Product }) {
                 aria-label={`Show image ${i + 1} of ${product.images.length}: ${img.alt}`}
                 aria-current={i === imageIndex ? 'true' : undefined}
                 className={`relative block aspect-square w-full overflow-hidden rounded-xl transition-all ${
-                  i === imageIndex ? 'ring-2 ring-primary ring-offset-2' : 'opacity-70 hover:opacity-100'
+                  i === imageIndex
+                    ? 'ring-2 ring-primary ring-offset-2'
+                    : 'opacity-70 hover:opacity-100'
                 }`}
               >
                 <Image src={img.url} alt="" fill sizes="120px" className="object-cover" />
@@ -137,8 +145,12 @@ export default function ProductDetail({ product }: { product: Product }) {
                     onChange={() => selectVariant(v.id)}
                     className="sr-only-live"
                   />
-                  <span className="block font-body-md text-body-md font-semibold">{v.weight_label}</span>
-                  <span className={`block font-label-sm text-label-sm ${selected ? 'opacity-90' : 'text-on-surface-variant'}`}>
+                  <span className="block font-body-md text-body-md font-semibold">
+                    {v.weight_label}
+                  </span>
+                  <span
+                    className={`block font-label-sm text-label-sm ${selected ? 'opacity-90' : 'text-on-surface-variant'}`}
+                  >
                     {soldOut ? 'Sold out' : formatPrice(v.price_cents)}
                   </span>
                 </label>
@@ -149,7 +161,10 @@ export default function ProductDetail({ product }: { product: Product }) {
 
         {/* Quantity */}
         <div className="mt-8">
-          <label htmlFor={qtyId} className="mb-3 block font-label-sm text-label-sm font-bold uppercase tracking-wider text-on-surface">
+          <label
+            htmlFor={qtyId}
+            className="mb-3 block font-label-sm text-label-sm font-bold uppercase tracking-wider text-on-surface"
+          >
             Quantity
           </label>
           <div className="flex items-center gap-3">
@@ -192,9 +207,7 @@ export default function ProductDetail({ product }: { product: Product }) {
           disabled={outOfStock}
           onClick={() => {
             addItem(product, variant, quantity)
-            toast(
-              `${quantity} × ${product.name} (${variant.weight_label}) added to your cart`,
-            )
+            toast(`${quantity} × ${product.name} (${variant.weight_label}) added to your cart`)
           }}
           className="mt-8 flex w-full items-center justify-center gap-2 rounded-full bg-primary py-4 font-label-sm text-label-sm text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
@@ -205,7 +218,10 @@ export default function ProductDetail({ product }: { product: Product }) {
         <div className="mt-10 space-y-4 border-t border-outline-variant pt-8">
           <h2 className="font-headline-md text-headline-md text-primary">About this product</h2>
           {product.description.split('\n\n').map((para) => (
-            <p key={para.slice(0, 32)} className="font-body-md text-body-md text-on-surface-variant">
+            <p
+              key={para.slice(0, 32)}
+              className="font-body-md text-body-md text-on-surface-variant"
+            >
               {para}
             </p>
           ))}
@@ -213,4 +229,21 @@ export default function ProductDetail({ product }: { product: Product }) {
       </div>
     </div>
   )
+}
+
+export default function ProductDetail({
+  product,
+  lowStockThreshold = LOW_STOCK_THRESHOLD,
+}: {
+  product: Product
+  lowStockThreshold?: number
+}) {
+  if (!product.variants.length)
+    return (
+      <section>
+        <h1 className="font-headline-lg text-primary">{product.name}</h1>
+        <p className="mt-4">This product is currently unavailable.</p>
+      </section>
+    )
+  return <PurchasableDetail product={product} lowStockThreshold={lowStockThreshold} />
 }

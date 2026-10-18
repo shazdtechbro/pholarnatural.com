@@ -6,15 +6,30 @@ import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { Check, ChevronLeft, Clock, CreditCard, Loader2, AlertCircle, CalendarDays, Lock } from 'lucide-react'
+import {
+  Check,
+  ChevronLeft,
+  Clock,
+  CreditCard,
+  Loader2,
+  AlertCircle,
+  CalendarDays,
+  Lock,
+} from 'lucide-react'
 import BookingCalendar from '@/components/BookingCalendar'
 import { Field } from '@/components/FormField'
 import { type Slot } from '@/lib/data'
 import { getAvailableSlots, createBooking, type BookingDepositResponse } from '@/lib/api/bookings'
-import { formatPrice, formatDuration, formatTime, formatDateLong, depositFor, addMinutes } from '@/lib/format'
+import {
+  formatPrice,
+  formatDuration,
+  formatTime,
+  formatDateLong,
+  depositFor,
+  addMinutes,
+} from '@/lib/format'
 import { CANCELLATION_POLICY, CURRENCY, DEPOSIT_RATE } from '@/lib/config'
-import { lastBooking, makeBookingReference, nowISO } from '@/lib/session-store'
-import type { Booking, BookingStatus, Service } from '@/lib/types'
+import type { Service } from '@/lib/types'
 
 // Step labels shown in the progress bar (indices 0–3; step 4 is the Payment icon)
 const STEP_LABELS = ['Service', 'Date', 'Time', 'Details'] as const
@@ -37,7 +52,7 @@ interface PaymentFormProps {
   onSuccess: () => void
 }
 
-function PaymentForm({ depositResponse, service, name, email, phone, date, time, onSuccess }: PaymentFormProps) {
+function PaymentForm({ depositResponse, name, email, phone, onSuccess }: PaymentFormProps) {
   const stripe = useStripe()
   const elements = useElements()
   const [paying, setPaying] = useState(false)
@@ -52,6 +67,10 @@ function PaymentForm({ depositResponse, service, name, email, phone, date, time,
     const { error, paymentIntent } = await stripe.confirmPayment({
       elements,
       redirect: 'if_required',
+      confirmParams: {
+        return_url: `${window.location.origin}/book/confirmation?id=${depositResponse.booking_id}&token=${encodeURIComponent(depositResponse.confirmation_token)}`,
+        payment_method_data: { billing_details: { email, name, ...(phone ? { phone } : {}) } },
+      },
     })
 
     if (error) {
@@ -61,24 +80,6 @@ function PaymentForm({ depositResponse, service, name, email, phone, date, time,
     }
 
     if (paymentIntent?.status === 'succeeded') {
-      const booking: Booking & { service_name: string } = {
-        id: depositResponse.booking_id,
-        reference: makeBookingReference(),
-        service_id: service.id,
-        service_name: service.name,
-        customer_name: name,
-        customer_email: email,
-        customer_phone: phone || null,
-        booking_date: date,
-        start_time: time,
-        end_time: addMinutes(time, service.duration_minutes),
-        status: 'confirmed' as BookingStatus,
-        deposit_cents: depositResponse.amount_cents,
-        stripe_payment_intent_id: paymentIntent.id,
-        cancellation_reason: null,
-        created_at: nowISO(),
-      }
-      lastBooking.set(booking)
       onSuccess()
     }
 
@@ -127,7 +128,7 @@ function PaymentForm({ depositResponse, service, name, email, phone, date, time,
 
 // ─── Payment step wrapper — creates the Stripe Elements provider ──────────────
 
-interface PaymentStepProps extends PaymentFormProps {}
+type PaymentStepProps = PaymentFormProps
 
 function PaymentStep(props: PaymentStepProps) {
   const stripePromise = useMemo(
@@ -196,7 +197,9 @@ export default function BookingFlow({ services, blockedDates }: BookingFlowProps
       setSlotsFor({ key: slotsKey, slots: s })
       setTime((t) => (t && s.find((x) => x.time === t)?.available ? t : null))
     })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [date, service, slotsKey])
 
   const canContinue = useMemo(() => {
@@ -241,21 +244,24 @@ export default function BookingFlow({ services, blockedDates }: BookingFlowProps
   }
 
   function handlePaymentSuccess() {
-    router.push('/book/confirmation')
+    if (depositResponse)
+      router.push(
+        `/book/confirmation?id=${depositResponse.booking_id}&token=${encodeURIComponent(depositResponse.confirmation_token)}`,
+      )
   }
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-16 md:px-16">
       {/* Progress */}
-      <ol className="mb-12 flex items-center justify-center gap-2 sm:gap-4">
+      <ol className="mb-12 flex items-center justify-center gap-1 sm:gap-4">
         {STEP_LABELS.map((label, i) => {
           const done = step > i
           const current = step === i
           return (
-            <li key={label} className="flex items-center gap-2 sm:gap-4">
+            <li key={label} className="flex items-center gap-1 sm:gap-4">
               <span
                 aria-current={current ? 'step' : undefined}
-                className={`flex items-center gap-2 rounded-full px-3 py-1.5 font-label-sm text-label-sm transition-colors sm:px-4 ${
+                className={`flex items-center gap-2 rounded-full px-2 py-1.5 font-label-sm text-label-sm transition-colors sm:px-4 ${
                   done
                     ? 'bg-primary/10 text-primary'
                     : current
@@ -273,18 +279,20 @@ export default function BookingFlow({ services, blockedDates }: BookingFlowProps
                 </span>
               </span>
               {i < STEP_LABELS.length - 1 && (
-                <span className="h-px w-4 bg-outline-variant sm:w-8" aria-hidden="true" />
+                <span className="h-px w-2 bg-outline-variant sm:w-8" aria-hidden="true" />
               )}
             </li>
           )
         })}
         {/* Payment icon step */}
-        <li className="flex items-center gap-2 sm:gap-4">
-          <span className="h-px w-4 bg-outline-variant sm:w-8" aria-hidden="true" />
+        <li className="flex items-center gap-1 sm:gap-4">
+          <span className="h-px w-2 bg-outline-variant sm:w-8" aria-hidden="true" />
           <span
             aria-current={step === 4 ? 'step' : undefined}
-            className={`flex items-center gap-2 rounded-full px-3 py-1.5 font-label-sm text-label-sm sm:px-4 ${
-              step === 4 ? 'bg-secondary text-white' : 'bg-surface-container-high text-on-surface-variant'
+            className={`flex items-center gap-2 rounded-full px-2 py-1.5 font-label-sm text-label-sm sm:px-4 ${
+              step === 4
+                ? 'bg-secondary text-white'
+                : 'bg-surface-container-high text-on-surface-variant'
             }`}
           >
             <CreditCard className="h-4 w-4" aria-hidden="true" />
@@ -328,7 +336,9 @@ export default function BookingFlow({ services, blockedDates }: BookingFlowProps
                     </div>
                     <div className="flex-1">
                       <h2 className="font-headline-md text-body-lg text-on-surface">{s.name}</h2>
-                      <p className="mt-1 font-body-md text-[13px] text-on-surface-variant">{s.description}</p>
+                      <p className="mt-1 font-body-md text-[13px] text-on-surface-variant">
+                        {s.description}
+                      </p>
                       <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                         <span className="font-body-md text-body-md font-bold text-primary">
                           {formatPrice(s.price_cents)}
@@ -375,7 +385,9 @@ export default function BookingFlow({ services, blockedDates }: BookingFlowProps
             {date && formatDateLong(date)} · {service?.name}
           </p>
 
-          <h2 className="mb-4 mt-8 font-headline-md text-headline-md text-primary">Available Slots</h2>
+          <h2 className="mb-4 mt-8 font-headline-md text-headline-md text-primary">
+            Available Slots
+          </h2>
 
           {loadingSlots ? (
             <p className="flex items-center gap-2 font-body-md text-body-md text-on-surface-variant">
@@ -499,7 +511,9 @@ export default function BookingFlow({ services, blockedDates }: BookingFlowProps
 
             {/* Booking summary */}
             <aside className="h-fit rounded-2xl border border-outline-variant bg-surface-container-low p-6">
-              <h2 className="mb-6 font-headline-md text-headline-md text-primary">Booking Summary</h2>
+              <h2 className="mb-6 font-headline-md text-headline-md text-primary">
+                Booking Summary
+              </h2>
               <dl className="space-y-3 font-body-md text-body-md">
                 <div className="flex justify-between gap-4">
                   <dt className="text-on-surface-variant">Service</dt>
@@ -507,7 +521,9 @@ export default function BookingFlow({ services, blockedDates }: BookingFlowProps
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-on-surface-variant">Date</dt>
-                  <dd className="text-right font-semibold text-on-surface">{formatDateLong(date)}</dd>
+                  <dd className="text-right font-semibold text-on-surface">
+                    {formatDateLong(date)}
+                  </dd>
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-on-surface-variant">Time</dt>
@@ -565,7 +581,9 @@ export default function BookingFlow({ services, blockedDates }: BookingFlowProps
 
             {/* Booking summary (read-only) */}
             <aside className="h-fit rounded-2xl border border-outline-variant bg-surface-container-low p-6">
-              <h2 className="mb-6 font-headline-md text-headline-md text-primary">Booking Summary</h2>
+              <h2 className="mb-6 font-headline-md text-headline-md text-primary">
+                Booking Summary
+              </h2>
               <dl className="space-y-3 font-body-md text-body-md">
                 <div className="flex justify-between gap-4">
                   <dt className="text-on-surface-variant">Service</dt>
@@ -573,7 +591,9 @@ export default function BookingFlow({ services, blockedDates }: BookingFlowProps
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-on-surface-variant">Date</dt>
-                  <dd className="text-right font-semibold text-on-surface">{formatDateLong(date)}</dd>
+                  <dd className="text-right font-semibold text-on-surface">
+                    {formatDateLong(date)}
+                  </dd>
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-on-surface-variant">Time</dt>
@@ -591,8 +611,8 @@ export default function BookingFlow({ services, blockedDates }: BookingFlowProps
                 </div>
               </dl>
               <p className="mt-4 font-body-md text-[12px] text-on-surface-variant">
-                Cancel within {CANCELLATION_POLICY.fullRefundWithinMinutes} minutes of booking for
-                a full refund. See the{' '}
+                Cancel within {CANCELLATION_POLICY.fullRefundWithinMinutes} minutes of booking for a
+                full refund. See the{' '}
                 <Link href="/refund-policy" className="underline underline-offset-2">
                   refund policy
                 </Link>

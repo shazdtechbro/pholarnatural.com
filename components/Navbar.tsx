@@ -78,10 +78,15 @@ export default function Navbar() {
         scrolled ? 'glass-effect shadow-sm' : 'bg-background'
       }`}
     >
-      <nav aria-label="Main" className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 md:px-16">
+      <nav
+        aria-label="Main"
+        className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 md:px-16"
+      >
         <Link href="/" className="flex items-center gap-2" aria-label="Pholar Natural — home">
           <Image src="/logo.svg" alt="" width={36} height={36} className="h-9 w-9" priority />
-          <span className="font-headline-md text-headline-md font-bold text-primary">Pholar Natural</span>
+          <span className="font-headline-md text-[20px] font-bold text-primary md:text-headline-md">
+            Pholar Natural
+          </span>
         </Link>
 
         <ul className="hidden items-center gap-8 md:flex">
@@ -105,7 +110,9 @@ export default function Navbar() {
         <div className="flex items-center gap-2 md:gap-4">
           <Link
             href="/cart"
-            aria-label={hydrated && count > 0 ? `Cart, ${count} item${count === 1 ? '' : 's'}` : 'Cart, empty'}
+            aria-label={
+              hydrated && count > 0 ? `Cart, ${count} item${count === 1 ? '' : 's'}` : 'Cart, empty'
+            }
             className="relative rounded-full p-2 text-on-surface-variant transition-all hover:bg-surface-container-high/60 hover:text-primary"
           >
             <ShoppingBag className="h-5 w-5" aria-hidden="true" />
@@ -132,7 +139,11 @@ export default function Navbar() {
             aria-label={open ? 'Close menu' : 'Open menu'}
             className="rounded-full p-2 text-primary transition-colors hover:bg-surface-container-high/60 md:hidden"
           >
-            {open ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
+            {open ? (
+              <X className="h-5 w-5" aria-hidden="true" />
+            ) : (
+              <Menu className="h-5 w-5" aria-hidden="true" />
+            )}
           </button>
         </div>
       </nav>

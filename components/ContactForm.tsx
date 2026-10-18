@@ -50,7 +50,7 @@ export default function ContactForm() {
         className="rounded-2xl border border-primary/30 bg-primary/5 p-8 text-center"
       >
         <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-primary" aria-hidden="true" />
-        <h2 className="mb-2 font-headline-md text-headline-md text-primary">Message sent</h2>
+        <h2 className="mb-2 font-headline-md text-headline-md text-primary">Message received</h2>
         <p className="font-body-md text-body-md text-on-surface-variant">
           Thanks {name.split(' ')[0]} — we&apos;ll get back to you within 24 hours at {email}.
         </p>
@@ -129,7 +129,9 @@ export default function ContactForm() {
       <button
         type="submit"
         disabled={status === 'sending'}
-        onClick={() => { if (status === 'error') setStatus('idle') }}
+        onClick={() => {
+          if (status === 'error') setStatus('idle')
+        }}
         className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-4 font-label-sm text-label-sm text-white transition-opacity hover:opacity-90 disabled:opacity-60"
       >
         {status === 'sending' ? (

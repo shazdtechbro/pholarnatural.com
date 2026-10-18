@@ -27,16 +27,18 @@ export interface BookingPayload {
   customer_name: string
   customer_email: string
   customer_phone?: string | null
-  booking_date: string  // YYYY-MM-DD
-  start_time: string    // HH:MM
+  booking_date: string // YYYY-MM-DD
+  start_time: string // HH:MM
 }
 
 /** Phase 9: backend creates a Payment Intent for the 10% deposit. */
 export interface BookingDepositResponse {
   booking_id: string
+  confirmation_token: string
+  reference: string
   client_secret: string
   publishable_key: string
-  amount_cents: number    // deposit amount
+  amount_cents: number // deposit amount
   booking_date: string
   start_time: string
   end_time: string
@@ -54,9 +56,7 @@ export interface BookingCancelResponse {
 // ─── Public functions ─────────────────────────────────────────────────────────
 
 export async function getBlockedDates(): Promise<string[]> {
-  const raw = await apiClient<RawBlockedDate[]>('/api/v1/bookings/blocked-dates', {
-    next: { revalidate: 300 },
-  })
+  const raw = await apiClient<RawBlockedDate[]>('/api/v1/bookings/blocked-dates', {})
   return raw.map((b) => b.date)
 }
 
@@ -85,9 +85,20 @@ export async function createBooking(payload: BookingPayload): Promise<BookingDep
 export async function cancelBooking(
   bookingId: string,
   reason?: string,
+  token?: string,
 ): Promise<BookingCancelResponse> {
   return apiClient<BookingCancelResponse>(`/api/v1/bookings/${bookingId}/cancel`, {
     method: 'POST',
     body: { cancellation_reason: reason ?? null },
+    headers: { 'X-Confirmation-Token': token ?? '' },
   })
 }
+
+export type BookingConfirmation = Omit<import('@/lib/types').Booking, 'status'> & {
+  service_name: string
+  status: string
+}
+export const getBookingConfirmation = (id: string, token: string) =>
+  apiClient<BookingConfirmation>(`/api/v1/bookings/${encodeURIComponent(id)}`, {
+    headers: { 'X-Confirmation-Token': token },
+  })

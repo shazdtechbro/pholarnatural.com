@@ -1,8 +1,10 @@
 'use client'
 
+import { useReducedMotion } from '@/lib/use-reduced-motion'
+
 import { useState, type ReactNode } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 
 export interface AccordionItem {
   id: string
@@ -32,11 +34,7 @@ export default function Accordion({
 
   const toggle = (id: string) =>
     setOpen((prev) =>
-      prev.includes(id)
-        ? prev.filter((x) => x !== id)
-        : allowMultiple
-          ? [...prev, id]
-          : [id],
+      prev.includes(id) ? prev.filter((x) => x !== id) : allowMultiple ? [...prev, id] : [id],
     )
 
   return (
@@ -54,7 +52,9 @@ export default function Accordion({
                 onClick={() => toggle(item.id)}
                 className="flex w-full items-center justify-between gap-4 p-5 text-left transition-colors hover:bg-surface-container-low"
               >
-                <span className="font-body-md text-body-lg font-semibold text-on-surface">{item.title}</span>
+                <span className="font-body-md text-body-lg font-semibold text-on-surface">
+                  {item.title}
+                </span>
                 <ChevronDown
                   className={`h-5 w-5 shrink-0 text-primary transition-transform duration-300 ${
                     isOpen ? 'rotate-180' : ''

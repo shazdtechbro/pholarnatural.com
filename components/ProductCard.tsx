@@ -27,13 +27,13 @@ interface ProductCardProps {
 export default function ProductCard({ product, imageUrl, priority = false }: ProductCardProps) {
   const activeVariants = product.variants.filter((v) => v.is_active)
   const firstInStock = activeVariants.find((v) => v.stock_count > 0) ?? activeVariants[0]
-  const [variantId, setVariantId] = useState(firstInStock.id)
+  const [variantId, setVariantId] = useState(firstInStock?.id ?? '')
   const variant = activeVariants.find((v) => v.id === variantId) ?? firstInStock
   const { addItem } = useCart()
   const { toast } = useToast()
   const groupId = useId()
 
-  const outOfStock = variant.stock_count === 0
+  const outOfStock = (variant?.stock_count ?? 0) <= 0 || (variant?.price_cents ?? 0) <= 0
 
   return (
     <TiltCard maxTilt={5} className="h-full">
@@ -73,17 +73,23 @@ export default function ProductCard({ product, imageUrl, priority = false }: Pro
               </Link>
             </h3>
             <span className="whitespace-nowrap font-body-md text-body-md font-bold text-primary">
-              {formatPrice(variant.price_cents)}
+              {variant ? formatPrice(variant.price_cents) : 'Currently unavailable'}
             </span>
           </div>
 
-          <p className="mb-4 font-body-md text-[13px] italic text-on-surface-variant">{product.tagline}</p>
+          <p className="mb-4 font-body-md text-[13px] italic text-on-surface-variant">
+            {product.tagline}
+          </p>
 
           <fieldset className="mb-6">
             <legend className="mb-2 font-label-sm text-[11px] uppercase tracking-wider text-on-surface-variant">
               Size
             </legend>
-            <div role="radiogroup" aria-label={`${product.name} size`} className="flex flex-wrap gap-2">
+            <div
+              role="radiogroup"
+              aria-label={`${product.name} size`}
+              className="flex flex-wrap gap-2"
+            >
               {activeVariants.map((v) => {
                 const selected = v.id === variantId
                 const soldOut = v.stock_count === 0
@@ -117,7 +123,7 @@ export default function ProductCard({ product, imageUrl, priority = false }: Pro
               type="button"
               disabled={outOfStock}
               onClick={() => {
-                addItem(product, variant)
+                if (variant) addItem(product, variant)
                 toast(`${product.name} (${variant.weight_label}) added to your cart`)
               }}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-surface-container-highest py-3 font-label-sm text-label-sm text-primary transition-all hover:bg-primary hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-surface-container-highest disabled:hover:text-primary"

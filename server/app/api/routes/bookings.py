@@ -2,7 +2,7 @@ from datetime import date
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Header
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_db, get_payment_gateway
@@ -32,11 +32,15 @@ def list_blocked_dates(db: Session = Depends(get_db)):
 @router.get("/slots", response_model=SlotsResponse)
 def get_slots(
     date: date = Query(..., description="Date to check (YYYY-MM-DD)"),
-    service_id: Optional[UUID] = Query(None, description="Service UUID — used to compute duration"),
+    service_id: Optional[UUID] = Query(
+        None, description="Service UUID — used to compute duration"
+    ),
     db: Session = Depends(get_db),
 ):
     """Return all 7 fixed slots (10:00–16:00) with availability for the given date."""
-    raw = booking_service.get_available_slots(db, target_date=date, service_id=service_id)
+    raw = booking_service.get_available_slots(
+        db, target_date=date, service_id=service_id
+    )
     return SlotsResponse(
         date=date,
         slots=[SlotInfo(time=s["time"], available=s["available"]) for s in raw],
@@ -54,6 +58,18 @@ def create_booking(
     for the 10% deposit. Mount the Payment Element on the client using client_secret.
     WhatsApp new_booking alert fires after the payment_intent.succeeded webhook arrives.
     """
+    from fastapi import HTTPException
+
+    key = settings.STRIPE_PUBLISHABLE_KEY
+    if not key.startswith(("pk_test_", "pk_live_")):
+        raise HTTPException(
+            503, "Deposit payment is not configured yet. Please contact the studio."
+        )
+    secret = settings.STRIPE_SECRET_KEY
+    if (secret.startswith("sk_test_") and not key.startswith("pk_test_")) or (
+        secret.startswith("sk_live_") and not key.startswith("pk_live_")
+    ):
+        raise HTTPException(503, "Deposit payment configuration needs attention.")
     db_booking, client_secret = booking_service.create_booking_with_payment_intent(
         db=db,
         booking_in=booking_in,
@@ -62,6 +78,10 @@ def create_booking(
     return BookingDepositResponse(
         booking_id=db_booking.id,
         client_secret=client_secret,
+        confirmation_token=__import__(
+            "app.core.security", fromlist=["customer_token"]
+        ).customer_token("booking", db_booking.id),
+        reference=f"PN-{str(db_booking.id)[:8].upper()}",
         publishable_key=settings.STRIPE_PUBLISHABLE_KEY,
         amount_cents=db_booking.deposit_cents,
         booking_date=db_booking.booking_date,
@@ -75,6 +95,7 @@ def create_booking(
 def cancel_booking(
     booking_id: UUID,
     cancel_in: BookingCancelRequest,
+    x_confirmation_token: str = Header(...),
     db: Session = Depends(get_db),
     payment_gateway: PaymentGateway = Depends(get_payment_gateway),
 ):
@@ -84,25 +105,14 @@ def cancel_booking(
     - Outside 30 minutes: cancelled without refund.
     Response includes refunded (bool) and a plain-English refund_policy_message.
     """
+    from app.core.security import verify_customer_token
+
+    verify_customer_token(x_confirmation_token, "booking", booking_id)
     booking, refunded, refund_message = booking_service.cancel_booking(
         db=db,
         booking_id=booking_id,
         cancellation_reason=cancel_in.cancellation_reason,
         payment_gateway=payment_gateway,
-    )
-
-    service_name = booking.service.name if booking.service else "Service"
-    reference = f"PN-{str(booking.id)[:8].upper()}"
-    booking_date = booking.booking_date.strftime("%d %b %Y")
-    reason = cancel_in.cancellation_reason or "No reason given"
-    notify(
-        NotificationEvent.BOOKING_CANCELLED,
-        f"❌ Booking Cancelled — {reference}\n"
-        f"{booking.customer_name} · {service_name} · {booking_date}\n"
-        f"Reason: {reason}\n"
-        f"Refund: {'yes' if refunded else 'no (outside 30-min window)'}\n"
-        f"pholarnatural.com/admin/bookings",
-        db,
     )
 
     return BookingCancelResponse(
@@ -112,3 +122,35 @@ def cancel_booking(
         refunded=refunded,
         refund_policy_message=refund_message,
     )
+
+
+@router.get("/{booking_id}")
+def booking_confirmation(
+    booking_id: UUID,
+    x_confirmation_token: str = Header(...),
+    db: Session = Depends(get_db),
+):
+    from app.core.security import verify_customer_token
+    from app.models.booking import Booking
+    from fastapi import HTTPException
+
+    verify_customer_token(x_confirmation_token, "booking", booking_id)
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(404, "Booking not found.")
+    return {
+        "id": str(booking.id),
+        "reference": f"PN-{str(booking.id)[:8].upper()}",
+        "service_name": booking.service.name,
+        "service_id": str(booking.service_id),
+        "customer_name": booking.customer_name,
+        "customer_email": booking.customer_email,
+        "customer_phone": booking.customer_phone,
+        "booking_date": booking.booking_date,
+        "start_time": booking.start_time,
+        "end_time": booking.end_time,
+        "status": booking.status,
+        "deposit_cents": booking.deposit_cents,
+        "cancellation_reason": booking.cancellation_reason,
+        "created_at": booking.created_at,
+    }

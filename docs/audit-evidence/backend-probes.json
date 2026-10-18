@@ -1,0 +1,81 @@
+[
+  {
+    "probe": "180-min service at 16:00 advertised unavailable",
+    "observed": {
+      "time": "16:00",
+      "available": false
+    }
+  },
+  {
+    "probe": "Same 16:00 booking accepted by creation",
+    "observed": {
+      "end_time": "19:00:00",
+      "status": "pending"
+    }
+  },
+  {
+    "probe": "Shipping on CAD 60 subtotal",
+    "observed": {
+      "subtotal": 6000,
+      "shipping": 995,
+      "tax": 909
+    }
+  },
+  {
+    "probe": "Admin response tax field",
+    "observed": {
+      "stored": 909,
+      "serialized": 0
+    }
+  },
+  {
+    "probe": "Two pending orders for single stock unit accepted",
+    "observed": {
+      "first": "bc3872a4-cdab-4280-a833-c812845d1876",
+      "second": "912b13ce-2206-46a9-aac4-ba955cd239ed",
+      "stock": 1
+    }
+  },
+  {
+    "probe": "Negative quantity accepted",
+    "observed": {
+      "subtotal": -6000,
+      "total": -5656
+    }
+  },
+  {
+    "probe": "Empty order accepted",
+    "observed": {
+      "subtotal": 0,
+      "total": 1124
+    }
+  },
+  {
+    "probe": "Checkout settings URL",
+    "observed": {
+      "requested": 404,
+      "actual": 200
+    }
+  },
+  {
+    "probe": "Admin cancellation skips refund",
+    "observed": {
+      "status": 200,
+      "gateway_refunds": 0
+    }
+  },
+  {
+    "probe": "Public cancellation without ownership check",
+    "observed": {
+      "status": 200,
+      "booking_status": "cancelled"
+    }
+  },
+  {
+    "probe": "Arbitrary order status accepted",
+    "observed": {
+      "status": 200,
+      "stored": "invented_status"
+    }
+  }
+]

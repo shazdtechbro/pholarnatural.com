@@ -38,12 +38,18 @@ export function confirmBooking(id: string): Promise<void> {
   return apiClient<void>(`/api/v1/admin/bookings/${id}/confirm`, { method: 'PUT', auth: true })
 }
 
-export function cancelBookingAdmin(id: string, reason?: string | null): Promise<void> {
-  return apiClient<void>(`/api/v1/admin/bookings/${id}/cancel`, {
-    method: 'PUT',
-    body: { cancellation_reason: reason ?? null },
-    auth: true,
-  })
+export function cancelBookingAdmin(
+  id: string,
+  reason?: string | null,
+): Promise<{ status: string; refunded: boolean; refund_policy_message: string }> {
+  return apiClient<{ status: string; refunded: boolean; refund_policy_message: string }>(
+    `/api/v1/admin/bookings/${id}/cancel`,
+    {
+      method: 'PUT',
+      body: { cancellation_reason: reason ?? null },
+      auth: true,
+    },
+  )
 }
 
 export function listAdminBlockedDates(): Promise<AdminBlockedDate[]> {

@@ -1,8 +1,6 @@
 import type { Metadata } from 'next'
 import ShopBrowser from '@/components/ShopBrowser'
-import Newsletter from '@/components/Newsletter'
 import { getProducts } from '@/lib/api/products'
-import { PRODUCT_CARD_IMAGE } from '@/lib/data'
 import { CURRENCY } from '@/lib/config'
 
 export const metadata: Metadata = {
@@ -18,7 +16,7 @@ export const metadata: Metadata = {
 }
 
 export default async function ShopPage() {
-  const products = await getProducts().catch(() => [] as import('@/lib/types').Product[])
+  const products = await getProducts()
 
   return (
     <div className="mx-auto max-w-7xl px-5 py-16 md:px-16">
@@ -35,9 +33,7 @@ export default async function ShopPage() {
         </p>
       </header>
 
-      <ShopBrowser products={products} cardImages={PRODUCT_CARD_IMAGE} />
-
-      <Newsletter />
+      <ShopBrowser products={products} cardImages={{}} />
     </div>
   )
 }

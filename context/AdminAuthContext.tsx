@@ -1,6 +1,14 @@
 'use client'
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  useEffect,
+  type ReactNode,
+} from 'react'
 import { useHydrated } from '@/lib/use-hydrated'
 import {
   adminLogin as apiAdminLogin,
@@ -26,6 +34,11 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     () => typeof window !== 'undefined' && !!window.sessionStorage.getItem(TOKEN_KEY),
   )
   const ready = useHydrated()
+  useEffect(() => {
+    const expired = () => setAuthenticated(false)
+    window.addEventListener('pholar:unauthorized', expired)
+    return () => window.removeEventListener('pholar:unauthorized', expired)
+  }, [])
 
   const signIn = useCallback(async (email: string, password: string) => {
     const token = await apiAdminLogin(email, password)

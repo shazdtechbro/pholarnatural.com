@@ -26,6 +26,7 @@ import {
   updateVariant,
   deleteVariant,
   uploadProductImage,
+  reorderProductImages,
   deleteProductImage,
 } from '@/lib/api/admin-products'
 import type { AdminProduct, AdminProductVariant, AdminProductImage } from '@/lib/api/admin-products'
@@ -57,7 +58,23 @@ export default function AdminProductsPage() {
     }
   }, [])
 
-  useEffect(() => { reload() }, [reload])
+  useEffect(() => {
+    let cancelled = false
+    listAdminProducts()
+      .then((data) => {
+        if (!cancelled) setProducts(data)
+      })
+      .catch((err) => {
+        if (!cancelled)
+          setFetchError(err instanceof Error ? err.message : 'Failed to load products.')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const closeForm = () => {
     setEditing(null)
@@ -109,7 +126,11 @@ export default function AdminProductsPage() {
       )}
 
       {products.length === 0 && !fetchError ? (
-        <EmptyState icon={Package} title="No products" message="Add your first product to get started." />
+        <EmptyState
+          icon={Package}
+          title="No products"
+          message="Add your first product to get started."
+        />
       ) : (
         <TableWrap caption="All products, including inactive ones">
           <thead>
@@ -129,7 +150,13 @@ export default function AdminProductsPage() {
                   <div className="flex items-center gap-3">
                     <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-surface-container">
                       {p.images[0] && (
-                        <Image src={p.images[0].url} alt="" fill sizes="48px" className="object-cover" />
+                        <Image
+                          src={p.images[0].url}
+                          alt=""
+                          fill
+                          sizes="48px"
+                          className="object-cover"
+                        />
                       )}
                     </div>
                     <div>
@@ -180,14 +207,17 @@ export default function AdminProductsPage() {
           open
           product={editing}
           onClose={closeForm}
-          onSaved={() => { closeForm(); reload() }}
+          onSaved={() => {
+            closeForm()
+            reload()
+          }}
         />
       )}
 
       <ConfirmDialog
         open={deleting !== null}
         title={`Delete ${deleting?.name}?`}
-        message="This removes the product and all its variants and images. This cannot be undone."
+        message="This removes the product from the storefront and active catalogue. Historical order records are retained."
         confirmLabel={deleteLoading ? 'Deleting…' : 'Delete'}
         onCancel={() => !deleteLoading && setDeleting(null)}
         onConfirm={confirmDelete}
@@ -199,7 +229,7 @@ export default function AdminProductsPage() {
 // ─── Variant local type (adds temp-ID tracking) ───────────────────────────────
 
 interface FormVariant {
-  id: string          // real UUID or `new_<timestamp>`
+  id: string // real UUID or `new_<timestamp>`
   weight_grams: number | null
   weight_label: string
   price_cents: number
@@ -236,14 +266,17 @@ function ProductForm({
   const { toast } = useToast()
 
   const [name, setName] = useState(product?.name ?? '')
+  const [seoTitle, setSeoTitle] = useState(product?.seo_title ?? '')
+  const [seoDescription, setSeoDescription] = useState(product?.seo_description ?? '')
+  const [bestseller, setBestseller] = useState(product?.is_bestseller ?? false)
   const [slug, setSlug] = useState(product?.slug ?? '')
   const [tagline, setTagline] = useState(product?.tagline ?? '')
   const [description, setDescription] = useState(product?.description ?? '')
   const [category, setCategory] = useState(product?.category ?? 'Hair Oil')
   const [isActive, setIsActive] = useState(product?.is_active ?? true)
 
-  const [variants, setVariants] = useState<FormVariant[]>(
-    () => (product?.variants ?? []).map(variantToForm),
+  const [variants, setVariants] = useState<FormVariant[]>(() =>
+    (product?.variants ?? []).map(variantToForm),
   )
   const [removedVariantIds, setRemovedVariantIds] = useState<string[]>([])
 
@@ -260,7 +293,17 @@ function ProductForm({
     try {
       if (product) {
         // 1. Update product details
-        await updateAdminProduct(product.id, { name, slug, tagline, description, category, is_active: isActive })
+        await updateAdminProduct(product.id, {
+          name,
+          slug,
+          tagline,
+          description,
+          category,
+          is_active: isActive,
+          seo_title: seoTitle,
+          seo_description: seoDescription,
+          is_bestseller: bestseller,
+        })
 
         // 2. Delete removed variants
         for (const id of removedVariantIds) {
@@ -307,6 +350,9 @@ function ProductForm({
         // Create product with all variants inline
         await createAdminProduct({
           name,
+          seo_title: seoTitle,
+          seo_description: seoDescription,
+          is_bestseller: bestseller,
           tagline,
           description,
           category,
@@ -371,11 +417,26 @@ function ProductForm({
         )}
 
         <Field
-          label="Name"
-          required
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          label="SEO title"
+          value={seoTitle}
+          maxLength={255}
+          onChange={(e) => setSeoTitle(e.target.value)}
         />
+        <TextareaField
+          label="SEO description"
+          value={seoDescription}
+          maxLength={500}
+          onChange={(e) => setSeoDescription(e.target.value)}
+        />
+        <label className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            checked={bestseller}
+            onChange={(e) => setBestseller(e.target.checked)}
+          />
+          Bestseller badge
+        </label>
+        <Field label="Name" required value={name} onChange={(e) => setName(e.target.value)} />
 
         {product && (
           <Field
@@ -386,29 +447,14 @@ function ProductForm({
           />
         )}
 
-        <Field
-          label="Tagline"
-          value={tagline}
-          onChange={(e) => setTagline(e.target.value)}
-        />
+        <Field label="Tagline" value={tagline} onChange={(e) => setTagline(e.target.value)} />
 
-        <div>
-          <label
-            htmlFor="product-category"
-            className="mb-1.5 block font-label-sm text-label-sm font-semibold text-on-surface"
-          >
-            Category
-          </label>
-          <select
-            id="product-category"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-3 font-body-md text-body-md text-on-surface"
-          >
-            <option value="Hair Oil">Hair Oil</option>
-            <option value="Shampoo">Shampoo</option>
-          </select>
-        </div>
+        <Field
+          label="Category"
+          value={category}
+          maxLength={100}
+          onChange={(e) => setCategory(e.target.value)}
+        />
 
         <TextareaField
           label="Description"
@@ -510,9 +556,7 @@ function ProductForm({
 
         <div className="flex flex-col gap-3 pt-2 sm:flex-row-reverse">
           <AdminButton type="submit" className="flex-1" onClick={undefined}>
-            {saving ? (
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            ) : null}
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
             {saving ? 'Saving…' : product ? 'Save changes' : 'Create product'}
           </AdminButton>
           <AdminButton variant="secondary" className="flex-1" onClick={onClose}>
@@ -562,6 +606,22 @@ function ImageManager({ product: initialProduct }: { product: AdminProduct }) {
     }
   }
 
+  async function move(index: number, direction: number) {
+    const next = [...images],
+      target = index + direction
+    if (target < 0 || target >= next.length) return
+    ;[next[index], next[target]] = [next[target], next[index]]
+    try {
+      await reorderProductImages(
+        initialProduct.id,
+        next.map((image) => image.id),
+      )
+      setImages(next)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not reorder images', 'error')
+    }
+  }
+
   return (
     <fieldset className="rounded-xl border border-outline-variant p-4">
       <legend className="px-2 font-label-sm text-label-sm font-bold uppercase text-primary">
@@ -569,9 +629,32 @@ function ImageManager({ product: initialProduct }: { product: AdminProduct }) {
       </legend>
 
       <ul className="mb-3 flex flex-wrap gap-3">
-        {images.map((img) => (
-          <li key={img.id} className="relative h-20 w-20 overflow-hidden rounded-lg bg-surface-container">
+        {images.map((img, index) => (
+          <li
+            key={img.id}
+            className="relative h-20 w-20 overflow-hidden rounded-lg bg-surface-container"
+          >
             <Image src={img.url} alt={img.alt ?? ''} fill sizes="80px" className="object-cover" />
+            <div className="absolute inset-x-0 bottom-0 flex justify-between bg-white/90">
+              <button
+                type="button"
+                aria-label={`Move image ${index + 1} earlier`}
+                disabled={index === 0}
+                onClick={() => move(index, -1)}
+                className="px-2"
+              >
+                ←
+              </button>
+              <button
+                type="button"
+                aria-label={`Move image ${index + 1} later`}
+                disabled={index === images.length - 1}
+                onClick={() => move(index, 1)}
+                className="px-2"
+              >
+                →
+              </button>
+            </div>
             <button
               type="button"
               onClick={() => handleDelete(img.id)}
@@ -579,18 +662,22 @@ function ImageManager({ product: initialProduct }: { product: AdminProduct }) {
               aria-label="Remove image"
               className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-error text-on-error shadow transition-opacity hover:opacity-90 disabled:opacity-50"
             >
-              {deletingId === img.id
-                ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-                : <X className="h-3 w-3" aria-hidden="true" />}
+              {deletingId === img.id ? (
+                <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+              ) : (
+                <X className="h-3 w-3" aria-hidden="true" />
+              )}
             </button>
           </li>
         ))}
       </ul>
 
       <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-outline px-4 py-2 font-label-sm text-label-sm text-on-surface-variant transition-colors hover:bg-surface-container-high">
-        {uploading
-          ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-          : <ImageUp className="h-4 w-4" aria-hidden="true" />}
+        {uploading ? (
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+        ) : (
+          <ImageUp className="h-4 w-4" aria-hidden="true" />
+        )}
         {uploading ? 'Uploading…' : 'Upload image'}
         <input
           ref={inputRef}

@@ -3,10 +3,11 @@
 import { useId } from 'react'
 
 export const CATEGORIES = ['All Products', 'Hair Oil', 'Shampoo'] as const
-export type Category = (typeof CATEGORIES)[number]
+export type Category = string
 
 export const SORTS = [
   { value: 'featured', label: 'Featured' },
+  { value: 'newest', label: 'Newest' },
   { value: 'price-asc', label: 'Price: Low to High' },
   { value: 'price-desc', label: 'Price: High to Low' },
   { value: 'name-asc', label: 'Name: A–Z' },
@@ -14,6 +15,7 @@ export const SORTS = [
 export type Sort = (typeof SORTS)[number]['value']
 
 interface ProductFiltersProps {
+  categories?: string[]
   category: Category
   onCategoryChange: (c: Category) => void
   sort: Sort
@@ -28,6 +30,7 @@ interface ProductFiltersProps {
  * selection; the sage fill is only the visual half of that.
  */
 export default function ProductFilters({
+  categories = [...CATEGORIES],
   category,
   onCategoryChange,
   sort,
@@ -38,7 +41,7 @@ export default function ProductFilters({
   return (
     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
       <div role="radiogroup" aria-label="Filter by category" className="flex flex-wrap gap-2">
-        {CATEGORIES.map((c) => {
+        {categories.map((c) => {
           const active = c === category
           return (
             <button

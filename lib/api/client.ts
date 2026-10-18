@@ -6,9 +6,7 @@
  * import `apiClient` from here and add nothing transport-level of their own.
  */
 
-const BASE = (
-  process.env.NEXT_PUBLIC_API_URL ?? 'https://api.pholarnatural.com'
-).replace(/\/$/, '')
+const BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'https://api.pholarnatural.com').replace(/\/$/, '')
 
 // ─── Error type ───────────────────────────────────────────────────────────────
 
@@ -84,17 +82,8 @@ export interface ApiClientOptions {
  *   // Admin call — requires JWT from sessionStorage
  *   const orders = await apiClient<Order[]>('/api/v1/admin/orders/', { auth: true })
  */
-export async function apiClient<T>(
-  path: string,
-  options: ApiClientOptions = {},
-): Promise<T> {
-  const {
-    method = 'GET',
-    body,
-    headers: extraHeaders = {},
-    auth = false,
-    next,
-  } = options
+export async function apiClient<T>(path: string, options: ApiClientOptions = {}): Promise<T> {
+  const { method = 'GET', body, headers: extraHeaders = {}, auth = false } = options
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -110,20 +99,21 @@ export async function apiClient<T>(
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
-    ...(next !== undefined ? { next } : {}),
+    cache: 'no-store',
+    signal: AbortSignal.timeout(15000),
   })
 
   if (!response.ok) {
+    if (auth && response.status === 401 && typeof window !== 'undefined') {
+      sessionStorage.removeItem('pholar_admin_token')
+      window.dispatchEvent(new Event('pholar:unauthorized'))
+    }
     let message = `HTTP ${response.status}`
     let errorBody: unknown
 
     try {
       errorBody = await response.json()
-      if (
-        typeof errorBody === 'object' &&
-        errorBody !== null &&
-        'detail' in errorBody
-      ) {
+      if (typeof errorBody === 'object' && errorBody !== null && 'detail' in errorBody) {
         const detail = (errorBody as { detail: unknown }).detail
         if (Array.isArray(detail)) {
           // FastAPI 422 Pydantic validation errors: [{loc, msg, type}, …]

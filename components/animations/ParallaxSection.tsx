@@ -1,6 +1,8 @@
 'use client'
 
-import { motion, useScroll, useTransform, useReducedMotion } from 'motion/react'
+import { useReducedMotion } from '@/lib/use-reduced-motion'
+
+import { motion, useScroll, useTransform } from 'motion/react'
 import { useRef, type ReactNode } from 'react'
 
 interface ParallaxSectionProps {
@@ -34,13 +36,9 @@ export default function ParallaxSection({
   })
   const y = useTransform(scrollYProgress, [0, 1], [offset, -offset])
 
-  if (reduced) {
-    return <div className={className}>{children}</div>
-  }
-
   return (
     <div ref={ref} className={className}>
-      <motion.div style={{ y }} className="will-change-transform">
+      <motion.div style={{ y: reduced ? 0 : y }} className="will-change-transform">
         {children}
       </motion.div>
     </div>

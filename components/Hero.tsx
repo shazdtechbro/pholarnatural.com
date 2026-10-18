@@ -3,20 +3,27 @@ import { ArrowRight, Globe, Leaf, ChevronDown } from 'lucide-react'
 import HeroCarousel from '@/components/HeroCarousel'
 import RevealOnScroll from '@/components/animations/RevealOnScroll'
 import ParallaxSection, { ParallaxBlob } from '@/components/animations/ParallaxSection'
-import { PRODUCTS, SERVICES } from '@/lib/data'
+import Image from 'next/image'
+import { getProducts } from '@/lib/api/products'
+import { getServices } from '@/lib/api/services'
+import { getPublicSettings } from '@/lib/api/settings'
 
 /*
  * Counted from the data rather than hardcoded. The service list changes — it went from five to
  * seven — and a stat that has to be remembered separately is a stat that goes stale.
  */
-const STATS = [
-  { value: '10k+', label: 'Happy Customers' },
-  { value: `${PRODUCTS.filter((p) => p.is_active).length}+`, label: 'Products' },
-  { value: String(SERVICES.filter((s) => s.is_active).length), label: 'Services' },
-]
-
-/** Homepage hero (doc §1.2.1). */
-export default function Hero() {
+/** Homepage hero uses the same active catalogue as administration and the shop. */
+export default async function Hero() {
+  const [products, services, settings] = await Promise.all([
+    getProducts(),
+    getServices(),
+    getPublicSettings(),
+  ])
+  const STATS = [
+    { value: '10k+', label: 'Happy Customers' },
+    { value: String(products.length), label: 'Products' },
+    { value: String(services.length), label: 'Services' },
+  ]
   return (
     <section className="relative mx-auto max-w-7xl overflow-hidden px-5 py-16 md:px-16">
       <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-2">
@@ -71,8 +78,13 @@ export default function Hero() {
                 <div key={s.label}>
                   <dt className="sr-only-live">{s.label}</dt>
                   <dd>
-                    <span className="block font-headline-md text-headline-md text-primary">{s.value}</span>
-                    <span className="font-label-sm text-label-sm uppercase text-on-surface-variant" aria-hidden="true">
+                    <span className="block font-headline-md text-headline-md text-primary">
+                      {s.value}
+                    </span>
+                    <span
+                      className="font-label-sm text-label-sm uppercase text-on-surface-variant"
+                      aria-hidden="true"
+                    >
                       {s.label}
                     </span>
                   </dd>
@@ -85,7 +97,18 @@ export default function Hero() {
         <div className="relative order-1 lg:order-2">
           <ParallaxSection offset={28}>
             <div className="relative aspect-[4/5] overflow-hidden rounded-3xl shadow-2xl">
-              <HeroCarousel />
+              {settings.hero_image_url ? (
+                <Image
+                  src={settings.hero_image_url}
+                  alt="Pholar Natural studio"
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                  priority
+                  className="object-cover"
+                />
+              ) : (
+                <HeroCarousel />
+              )}
             </div>
           </ParallaxSection>
 
@@ -99,7 +122,10 @@ export default function Hero() {
             100% Natural
           </p>
 
-          <ParallaxBlob className="absolute -right-12 -top-12 h-48 w-48 rounded-full bg-secondary-container/30" offset={32} />
+          <ParallaxBlob
+            className="absolute -right-12 -top-12 h-48 w-48 rounded-full bg-secondary-container/30"
+            offset={32}
+          />
           <ParallaxBlob
             className="absolute -bottom-12 -left-12 h-64 w-64 rounded-full bg-primary-container/10"
             offset={-24}

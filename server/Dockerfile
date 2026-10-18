@@ -24,6 +24,9 @@ COPY --from=builder /install /usr/local
 
 # Copy application source
 COPY . .
+RUN groupadd --system pholar && useradd --system --gid pholar --home-dir /app pholar
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+USER pholar
 
 EXPOSE 8000
 

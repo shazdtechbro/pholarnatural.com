@@ -1,15 +1,18 @@
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
+from app.schemas.common import InputModel, Name
 from typing import List, Optional
 from datetime import datetime
 
+
 # ----- CONTACT MESSAGES -----
-class ContactCreate(BaseModel):
-    name: str
+class ContactCreate(InputModel):
+    name: Name
     email: EmailStr
-    subject: Optional[str] = None
-    message: str
+    subject: Optional[str] = Field(default=None, max_length=255)
+    message: str = Field(min_length=1, max_length=5000)
+
 
 class ContactResponse(ContactCreate):
     id: UUID
@@ -17,17 +20,21 @@ class ContactResponse(ContactCreate):
     created_at: datetime
     model_config = {"from_attributes": True}
 
+
 # ----- SETTINGS -----
 class SettingItem(BaseModel):
     key: str
     value: str
     model_config = {"from_attributes": True}
 
+
 class TestMessage(BaseModel):
-    target: str # email address or phone number
-    message: str
+    target: str  # email address or phone number
+    message: str = Field(min_length=1, max_length=5000)
+
 
 # ----- DASHBOARD -----
+
 
 class DashboardOrder(BaseModel):
     id: str
@@ -37,6 +44,7 @@ class DashboardOrder(BaseModel):
     status: str
     created_at: str
 
+
 class DashboardBooking(BaseModel):
     id: str
     customer_name: str
@@ -45,6 +53,7 @@ class DashboardBooking(BaseModel):
     booking_date: str
     start_time: str
     status: str
+
 
 class DashboardStats(BaseModel):
     orders_today: int

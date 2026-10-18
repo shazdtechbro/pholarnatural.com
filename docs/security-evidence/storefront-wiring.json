@@ -1,0 +1,15 @@
+{
+  "evidence": [
+    "Admin-created product appears on homepage with a real database ID",
+    "New product appears in shop and its dynamic category filter",
+    "Product SEO is stored; script-like description remains inert",
+    "Featured ordering, hero image and footer social setting reach storefront",
+    "Contact page social link uses same saved settings",
+    "Checkout respects zero shipping and zero tax settings",
+    "Already-open checkout refreshes shipping and tax settings on focus",
+    "Same product is visible in authenticated admin",
+    "Admin deletion removes product from both homepage and shop",
+    "Deleted product is also removed from sitemap"
+  ],
+  "errors": []
+}

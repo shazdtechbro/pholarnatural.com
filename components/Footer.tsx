@@ -3,7 +3,8 @@ import Image from 'next/image'
 import { Mail, ShieldCheck } from 'lucide-react'
 import { InstagramIcon, FacebookIcon, TikTokIcon } from '@/components/icons/Social'
 import { BUSINESS } from '@/lib/config'
-import { SERVICES } from '@/lib/data'
+import { getServices } from '@/lib/api/services'
+import { getPublicSettings } from '@/lib/api/settings'
 
 /**
  * Site footer (doc §1.1.1): four columns — brand plus the Shop, Services and Company link
@@ -23,34 +24,17 @@ type SocialLinks = {
 }
 
 async function getSocialLinks(): Promise<SocialLinks> {
-  const empty: SocialLinks = { instagram_url: '', facebook_url: '', tiktok_url: '' }
-  const base = process.env.NEXT_PUBLIC_API_URL ?? ''
-  // Skip fetch entirely when there is no base URL (build-time without env var configured).
-  if (!base) return empty
-  try {
-    const controller = new AbortController()
-    // 4-second hard ceiling — prevents hanging Vercel build workers.
-    const timer = setTimeout(() => controller.abort(), 4000)
-    const res = await fetch(`${base}/api/v1/settings/public`, {
-      next: { revalidate: 300 },
-      signal: controller.signal,
-    })
-    clearTimeout(timer)
-    if (!res.ok) return empty
-    const d = await res.json()
-    return {
-      instagram_url: d.instagram_url ?? '',
-      facebook_url: d.facebook_url ?? '',
-      tiktok_url: d.tiktok_url ?? '',
-    }
-  } catch {
-    return empty
+  const settings = await getPublicSettings()
+  return {
+    instagram_url: settings.instagram_url ?? '',
+    facebook_url: settings.facebook_url ?? '',
+    tiktok_url: settings.tiktok_url ?? '',
   }
 }
 
 export default async function Footer() {
   const year = new Date().getFullYear()
-  const social = await getSocialLinks()
+  const [social, services] = await Promise.all([getSocialLinks(), getServices()])
 
   return (
     <footer className="border-t border-outline-variant bg-surface-container-low">
@@ -58,10 +42,13 @@ export default async function Footer() {
         <div className="space-y-6">
           <Link href="/" className="flex items-center gap-2" aria-label="Pholar Natural — home">
             <Image src="/logo.svg" alt="" width={32} height={32} className="h-8 w-8" />
-            <span className="font-headline-md text-headline-md font-bold text-primary">Pholar Natural</span>
+            <span className="font-headline-md text-[20px] font-bold text-primary md:text-headline-md">
+              Pholar Natural
+            </span>
           </Link>
           <p className="font-body-md text-body-md text-on-surface-variant">
-            Bridging the gap between raw African tradition and premium clinical-grade organic beauty.
+            Bridging the gap between raw African tradition and premium clinical-grade organic
+            beauty.
           </p>
           <address className="font-body-md text-body-md not-italic text-on-surface-variant">
             {BUSINESS.addressLines.map((line) => (
@@ -137,7 +124,7 @@ export default async function Footer() {
           title="Services"
           links={[
             { href: '/services', label: 'All Services' },
-            ...SERVICES.slice(0, 3).map((s) => ({ href: `/services#${s.slug}`, label: s.name })),
+            ...services.slice(0, 3).map((s) => ({ href: `/services#${s.slug}`, label: s.name })),
             { href: '/book', label: 'Book an Appointment' },
           ]}
         />

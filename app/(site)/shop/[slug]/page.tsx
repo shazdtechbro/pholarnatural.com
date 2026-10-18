@@ -1,3 +1,5 @@
+import { getPublicSettings } from '@/lib/api/settings'
+import { serializeJsonLd } from '@/lib/json-ld'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -5,7 +7,6 @@ import { notFound } from 'next/navigation'
 import { ChevronRight, ArrowRight } from 'lucide-react'
 import ProductDetail from '@/components/ProductDetail'
 import { getProductBySlug, getProducts, getProductSlugs } from '@/lib/api/products'
-import { PRODUCT_CARD_IMAGE } from '@/lib/data'
 import { formatPrice } from '@/lib/format'
 import { SITE_URL, CURRENCY } from '@/lib/config'
 
@@ -30,17 +31,26 @@ export async function generateMetadata(props: PageProps<'/shop/[slug]'>): Promis
     const product = await getProductBySlug(slug)
     if (!product) return { title: 'Product not found' }
 
-    const lowest = Math.min(...product.variants.map((v) => v.price_cents))
+    const lowest = product.variants.length
+      ? Math.min(...product.variants.map((v) => v.price_cents))
+      : null
     return {
-      title: product.name,
-      description: `${product.tagline}. ${product.description.slice(0, 150)}… From ${formatPrice(lowest)}.`,
+      title: product.seo_title || product.name,
+      description:
+        product.seo_description ||
+        `${product.tagline}. ${product.description.slice(0, 150)}… ${lowest === null ? 'Currently unavailable' : `From ${formatPrice(lowest)}`}.`,
       alternates: { canonical: `/shop/${product.slug}` },
       openGraph: {
         type: 'website',
         title: `${product.name} | Pholar Natural`,
         description: product.tagline,
         url: `/shop/${product.slug}`,
-        images: [{ url: product.images[0].url, alt: product.images[0].alt }],
+        images: [
+          {
+            url: product.images[0]?.url || '/images/hero/woman-braids.webp',
+            alt: product.images[0]?.alt || product.name,
+          },
+        ],
       },
     }
   } catch {
@@ -50,11 +60,14 @@ export async function generateMetadata(props: PageProps<'/shop/[slug]'>): Promis
 
 export default async function ProductPage(props: PageProps<'/shop/[slug]'>) {
   const { slug } = await props.params
-  const product = await getProductBySlug(slug).catch(() => null)
+  const product = await getProductBySlug(slug)
   if (!product) notFound()
 
-  const others = (await getProducts().catch(() => [])).filter((p) => p.id !== product.id)
-  const lowest = Math.min(...product.variants.map((v) => v.price_cents))
+  const settings = await getPublicSettings()
+  const others = (await getProducts()).filter((p) => p.id !== product.id)
+  const lowest = product.variants.length
+    ? Math.min(...product.variants.map((v) => v.price_cents))
+    : null
 
   return (
     <div className="mx-auto max-w-7xl px-5 py-10 md:px-16 md:py-16">
@@ -62,12 +75,12 @@ export default async function ProductPage(props: PageProps<'/shop/[slug]'>) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+          __html: serializeJsonLd({
             '@context': 'https://schema.org',
             '@type': 'Product',
             name: product.name,
             description: product.description,
-            image: product.images.map((i) => `${SITE_URL}${i.url}`),
+            image: product.images.map((i) => new URL(i.url, SITE_URL).href),
             brand: { '@type': 'Brand', name: 'Pholar Natural' },
             sku: product.variants[0]?.sku,
             offers: product.variants.map((v) => ({
@@ -77,9 +90,7 @@ export default async function ProductPage(props: PageProps<'/shop/[slug]'>) {
               price: (v.price_cents / 100).toFixed(2),
               priceCurrency: CURRENCY,
               availability:
-                v.stock_count > 0
-                  ? 'https://schema.org/InStock'
-                  : 'https://schema.org/OutOfStock',
+                v.stock_count > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
               url: `${SITE_URL}/shop/${product.slug}`,
             })),
             ...(product.rating && {
@@ -113,7 +124,10 @@ export default async function ProductPage(props: PageProps<'/shop/[slug]'>) {
         </ol>
       </nav>
 
-      <ProductDetail product={product} />
+      <ProductDetail
+        product={product}
+        lowStockThreshold={Number(settings.low_stock_threshold ?? 5)}
+      />
 
       {others.length > 0 && (
         <section className="mt-20 border-t border-outline-variant pt-16">
@@ -121,9 +135,15 @@ export default async function ProductPage(props: PageProps<'/shop/[slug]'>) {
             <h2 className="font-headline-lg text-headline-lg-mobile text-primary md:text-headline-lg">
               You may also like
             </h2>
-            <Link href="/shop" className="group flex items-center gap-2 font-label-sm text-label-sm text-primary">
+            <Link
+              href="/shop"
+              className="group flex items-center gap-2 font-label-sm text-label-sm text-primary"
+            >
               View Shop
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+              <ArrowRight
+                className="h-4 w-4 transition-transform group-hover:translate-x-1"
+                aria-hidden="true"
+              />
             </Link>
           </div>
 
@@ -136,7 +156,7 @@ export default async function ProductPage(props: PageProps<'/shop/[slug]'>) {
                 >
                   <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl">
                     <Image
-                      src={PRODUCT_CARD_IMAGE[p.slug] ?? p.images[0].url}
+                      src={p.images[0].url}
                       alt=""
                       fill
                       sizes="96px"
@@ -145,7 +165,9 @@ export default async function ProductPage(props: PageProps<'/shop/[slug]'>) {
                   </div>
                   <div className="flex flex-col justify-center">
                     <h3 className="font-headline-md text-body-lg text-on-surface">{p.name}</h3>
-                    <p className="font-body-md text-[13px] italic text-on-surface-variant">{p.tagline}</p>
+                    <p className="font-body-md text-[13px] italic text-on-surface-variant">
+                      {p.tagline}
+                    </p>
                     <p className="mt-1 font-body-md text-body-md font-bold text-primary">
                       From {formatPrice(Math.min(...p.variants.map((v) => v.price_cents)))}
                     </p>
@@ -158,7 +180,8 @@ export default async function ProductPage(props: PageProps<'/shop/[slug]'>) {
       )}
 
       <p className="mt-10 text-center font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">
-        All prices in {CURRENCY} · From {formatPrice(lowest)}
+        All prices in {CURRENCY}
+        {lowest !== null && <> · From {formatPrice(lowest)}</>}
       </p>
     </div>
   )

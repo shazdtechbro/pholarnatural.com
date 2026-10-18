@@ -1,3 +1,4 @@
+import StorefrontRefresh from '@/components/StorefrontRefresh'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import CookieConsent from '@/components/CookieConsent'
@@ -15,6 +16,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
       <a href="#main" className="skip-link">
         Skip to main content
       </a>
+      <StorefrontRefresh />
       <Navbar />
       <main id="main" className="pt-[73px]">
         {children}
