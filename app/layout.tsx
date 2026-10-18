@@ -1,22 +1,25 @@
 import type { Metadata } from 'next'
-import { Playfair_Display, Montserrat } from 'next/font/google'
+import localFont from 'next/font/local'
 import './globals.css'
 import ToastViewport from '@/components/Toast'
 import { CartProvider } from '@/context/CartContext'
 import { ToastProvider } from '@/context/ToastContext'
 import { SITE_URL, BUSINESS } from '@/lib/config'
 
-const playfair = Playfair_Display({
-  subsets: ['latin'],
+const playfair = localFont({
+  src: './fonts/playfair-display-latin-wght-normal.woff2',
   variable: '--font-playfair',
-  weight: ['600', '700'],
+  weight: '600 700',
+  style: 'normal',
+  fallback: ['Georgia', 'serif'],
   display: 'swap',
 })
 
-const montserrat = Montserrat({
-  subsets: ['latin'],
+const montserrat = localFont({
+  src: './fonts/montserrat-latin-wght-normal.woff2',
   variable: '--font-montserrat',
-  weight: ['400', '600', '700'],
+  weight: '400 700',
+  style: 'normal',
   display: 'swap',
 })
 
