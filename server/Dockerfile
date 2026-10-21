@@ -22,9 +22,9 @@ WORKDIR /app
 # Copy installed packages from builder stage
 COPY --from=builder /install /usr/local
 
-# Copy application source
-COPY . .
 RUN groupadd --system pholar && useradd --system --gid pholar --home-dir /app pholar
+# Own the copied files even when the deployment checkout uses a private umask.
+COPY --chown=pholar:pholar . .
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 USER pholar
 
