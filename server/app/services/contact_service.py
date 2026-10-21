@@ -41,6 +41,10 @@ def create_contact_message(db: Session, contact_in: ContactCreate):
             ],
         ),
     )
+    from app.models.notification import EmailDelivery
+    db.flush()
+    for delivery in db.query(EmailDelivery).filter(EmailDelivery.event_key.like(f"contact:{db_message.id}:admin:%")).all():
+        delivery.reply_to = str(contact_in.email)
     db.commit()
     db.refresh(db_message)
     return db_message

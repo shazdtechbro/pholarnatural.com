@@ -4,13 +4,6 @@ import { useId, useState } from 'react'
 import { Send } from 'lucide-react'
 import { useToast } from '@/context/ToastContext'
 
-/**
- * Newsletter signup ("Join the Natural Ritual" in the Stitch shop screen).
- *
- * There is no mailing-list backend this sprint, so the submit resolves locally and says so
- * honestly rather than implying a subscription was recorded. Wire this to the email provider
- * in week 3 (doc §5.2).
- */
 export default function Newsletter() {
   const id = useId()
   const [email, setEmail] = useState('')
@@ -28,14 +21,24 @@ export default function Newsletter() {
 
       <form
         className="mx-auto mt-8 flex max-w-md flex-col gap-3 sm:flex-row"
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault()
           setSubmitting(true)
-          setTimeout(() => {
-            setSubmitting(false)
+          try {
+            const base = (process.env.NEXT_PUBLIC_API_URL ?? 'https://api.pholarnatural.com').replace(/\/$/, '')
+            const response = await fetch(`${base}/api/v1/newsletter/subscribe`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: email.trim() }),
+            })
+            if (!response.ok) throw new Error(response.status === 429 ? 'Please wait before trying again.' : 'Could not subscribe. Please try again.')
             setEmail('')
-            toast("Thanks — we'll be in touch when the journal launches.", 'info')
-          }, 500)
+            toast('Check your email to confirm your subscription.', 'success')
+          } catch (error) {
+            toast(error instanceof Error ? error.message : 'Could not subscribe. Please try again.', 'error')
+          } finally {
+            setSubmitting(false)
+          }
         }}
       >
         <div className="flex-1 text-left">

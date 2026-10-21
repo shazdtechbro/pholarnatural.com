@@ -1,0 +1,2 @@
+def _base(preheader, content):
+    return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pholar Natural</title></head><body style="margin:0;background:#fcf9f2;font-family:Arial,sans-serif;color:#334537"><main style="max-width:600px;margin:40px auto;background:white;padding:32px;border-radius:12px"><p style="font-size:22px;font-weight:bold">Pholar Natural</p>'+content+'<hr><p>Questions? <a href="https://pholarnatural.com/contact">Contact us</a>.</p></main></body></html>'

@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Text, Integer, DateTime
+from sqlalchemy import Column, String, Text, Integer, DateTime, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from app.db.database import Base
@@ -22,3 +22,8 @@ class EmailDelivery(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     sent_at = Column(DateTime(timezone=True), nullable=True)
+    provider_id = Column(String(255))
+    provider_key = Column(String(255))
+    payload = Column(JSON)
+    first_attempt_at = Column(DateTime(timezone=True))
+    reply_to = Column(String(255))

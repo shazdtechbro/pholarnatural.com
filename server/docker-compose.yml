@@ -29,8 +29,28 @@ services:
       - /tmp
     restart: unless-stopped
     env_file: .env
+    environment:
+      EMAIL_WORKER_ENABLED: "false"
     ports:
       - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+
+  mail-worker:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    command: ["python", "-m", "app.services.mail_delivery"]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
     depends_on:
       db:
         condition: service_healthy

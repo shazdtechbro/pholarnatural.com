@@ -8,6 +8,8 @@ export default function EmailStatus() {
     queued: number
     sent: number
     retrying: number
+    delivered: number
+    needs_attention: number
   } | null>(null)
   const [message, setMessage] = useState(''),
     [busy, setBusy] = useState(false)
@@ -42,7 +44,7 @@ export default function EmailStatus() {
       </p>
       {status && (
         <p>
-          {status.queued} queued · {status.retrying} retrying · {status.sent} accepted by provider
+          {status.queued} queued · {status.retrying} retrying · {status.sent} accepted by provider · {status.delivered} delivered · {status.needs_attention} need attention
         </p>
       )}
       <button

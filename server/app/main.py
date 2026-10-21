@@ -143,3 +143,6 @@ def health():
         db.execute(text("SELECT 1 FROM admin_settings LIMIT 1"))
         db.execute(text("SELECT 1 FROM email_deliveries LIMIT 1"))
     return {"status": "ok"}
+
+from app.api.routes import newsletter
+app.include_router(newsletter.router, prefix="/api/v1/newsletter", tags=["Newsletter"])

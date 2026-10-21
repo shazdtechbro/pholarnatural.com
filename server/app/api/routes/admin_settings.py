@@ -171,7 +171,9 @@ def email_status(
         "queued": db.query(EmailDelivery)
         .filter(EmailDelivery.status == "queued")
         .count(),
-        "sent": db.query(EmailDelivery).filter(EmailDelivery.status == "sent").count(),
+        "sent": db.query(EmailDelivery).filter(EmailDelivery.status.in_(["sent", "accepted", "delivered"])).count(),
+        "delivered": db.query(EmailDelivery).filter_by(status="delivered").count(),
+        "needs_attention": db.query(EmailDelivery).filter(EmailDelivery.status.in_(["needs_review", "bounced", "complained", "suppressed", "failed"])).count(),
         "retrying": db.query(EmailDelivery)
         .filter(EmailDelivery.status == "queued", EmailDelivery.attempts > 0)
         .count(),
@@ -197,5 +199,35 @@ def email_test(
             ["This test was requested from the Pholar Natural administration panel."],
         ),
     )
+    db.commit()
+    return {"queued": True}
+
+
+@router.get("/email/deliveries")
+def email_deliveries(db: Session = Depends(get_db), current_admin: AdminUser = Depends(get_current_admin)):
+    from app.models.notification import EmailDelivery
+    return [{"id": r.id, "event": r.event_key, "status": r.status, "attempts": r.attempts, "provider_id": r.provider_id, "last_error": r.last_error} for r in db.query(EmailDelivery).order_by(EmailDelivery.created_at.desc()).limit(100).all()]
+
+
+@router.post("/email/deliveries/{delivery_id}/retry", status_code=202)
+def retry_email(delivery_id: str, db: Session = Depends(get_db), current_admin: AdminUser = Depends(get_current_admin)):
+    from uuid import UUID
+    from datetime import timedelta, timezone
+    from app.models.notification import EmailDelivery
+    from app.services.mail_delivery import utcnow
+    try:
+        parsed = UUID(delivery_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid delivery ID.")
+    row = db.query(EmailDelivery).filter_by(id=parsed).with_for_update().first()
+    if not row:
+        raise HTTPException(404, "Delivery not found.")
+    if row.status not in ("needs_review", "queued"):
+        raise HTTPException(409, "This delivery cannot be retried.")
+    if not row.provider_id and row.first_attempt_at and utcnow()-row.first_attempt_at.replace(tzinfo=timezone.utc) >= timedelta(hours=23):
+        raise HTTPException(409, "Review Resend history before manually reissuing this message; its duplicate-prevention window expired.")
+    row.status = "accepted" if row.provider_id else "queued"
+    row.next_attempt_at = utcnow()
+    row.last_error = None
     db.commit()
     return {"queued": True}

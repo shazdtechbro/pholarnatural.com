@@ -63,9 +63,9 @@ jobs:
             set -eu
             cd ~/pholarnatural.com/server
             git pull --ff-only origin main
-            docker compose build api
+            docker compose build api mail-worker
             docker compose run --rm --no-deps api alembic upgrade head
-            docker compose up -d api
+            docker compose up -d api mail-worker
             for attempt in $(seq 1 20); do
               if curl --fail --silent http://127.0.0.1:8000/health > /dev/null; then exit 0; fi
               sleep 2

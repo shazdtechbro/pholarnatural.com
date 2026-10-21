@@ -53,9 +53,15 @@ def queue_email(db, key, recipient, subject, html):
         or db.query(EmailDelivery.id).filter(EmailDelivery.event_key == key).first()
     ):
         return
+    suppressed = db.query(EmailDelivery.id).filter(
+        EmailDelivery.recipient == recipient,
+        EmailDelivery.status.in_(["bounced", "complained", "suppressed"]),
+    ).first()
     db.add(
         EmailDelivery(
-            event_key=key, recipient=recipient, subject=subject[:255], html=html
+            event_key=key, recipient=recipient, subject=subject[:255], html=html,
+            status="suppressed" if suppressed else "queued",
+            last_error="Recipient previously bounced or complained" if suppressed else None,
         )
     )
 
@@ -162,6 +168,16 @@ def queue_booking_confirmed(db, booking):
         ),
     )
 
+    from zoneinfo import ZoneInfo
+    appointment = datetime.combine(booking.booking_date, booking.start_time, ZoneInfo(settings.BUSINESS_TIMEZONE))
+    reminder_at = appointment - timedelta(hours=24)
+    if reminder_at > datetime.now(timezone.utc):
+        key = f"reminder/{booking.id}/{booking.booking_date}/{booking.start_time}"
+        queue_email(db, key, booking.customer_email, *message("Your appointment is tomorrow", [booking.service.name, str(booking.booking_date), f"{booking.start_time} ({settings.BUSINESS_TIMEZONE})", "Please arrive five minutes early. Contact us if you need help."]))
+        db.flush()
+        row = db.query(EmailDelivery).filter_by(event_key=key).one()
+        row.next_attempt_at = reminder_at
+
 
 def queue_booking_cancelled(db, booking, refund_message):
     key = f"booking:{booking.id}:cancelled"
@@ -198,71 +214,8 @@ def queue_payment_failed(db, record, kind):
 
 
 def deliver_one(db, sender=None):
-    if not settings.RESEND_API_KEY and sender is None:
-        return False
-    row = (
-        db.query(EmailDelivery)
-        .filter(
-            EmailDelivery.status == "queued",
-            EmailDelivery.next_attempt_at <= datetime.now(timezone.utc),
-        )
-        .order_by(EmailDelivery.created_at)
-        .with_for_update(skip_locked=True)
-        .first()
-    )
-    if not row:
-        return False
-    row.attempts += 1
-    try:
-        recipients = [row.recipient]
-        if row.recipient == "__admin__":
-            recipients = [
-                v.strip() for v in (settings.ADMIN_EMAIL or "").split(",") if v.strip()
-            ]
-            if not recipients:
-                raise RuntimeError("ADMIN_EMAIL is not configured")
-        if sender:
-            sender(row)
-        else:
-            payload = json.dumps(
-                {
-                    "from": settings.DEFAULT_FROM_EMAIL,
-                    "to": recipients,
-                    "subject": row.subject,
-                    "html": row.html,
-                }
-            ).encode()
-            request = urllib.request.Request(
-                "https://api.resend.com/emails",
-                data=payload,
-                method="POST",
-                headers={
-                    "Authorization": "Bearer " + settings.RESEND_API_KEY,
-                    "Content-Type": "application/json",
-                    "Idempotency-Key": str(row.id),
-                },
-            )
-            with urllib.request.urlopen(request, timeout=15) as response:
-                if response.status not in (200, 201, 202):
-                    raise RuntimeError("Email provider did not accept the message")
-        row.status = "sent"
-        row.sent_at = datetime.now(timezone.utc)
-        row.last_error = None
-    except Exception as exc:
-        # Safe status only, never credentials, recipient, body or provider error text.
-        row.last_error = (
-            "HTTP " + str(exc.code)
-            if isinstance(exc, urllib.error.HTTPError)
-            else type(exc).__name__
-        )
-        row.next_attempt_at = datetime.now(timezone.utc) + timedelta(
-            seconds=min(3600, 30 * 2 ** min(row.attempts, 7))
-        )
-        logger.warning(
-            "Email delivery deferred for row %s (%s)", row.id, row.last_error
-        )
-    db.commit()
-    return True
+    from app.services.mail_delivery import process_one
+    return process_one(db, sender)
 
 
 def start_worker(stop):
@@ -272,6 +225,7 @@ def start_worker(stop):
                 with SessionLocal() as db:
                     processed = deliver_one(db)
                 if processed:
+                    stop.wait(1)
                     continue
             except Exception:
                 logger.warning("Email queue unavailable; will retry")
