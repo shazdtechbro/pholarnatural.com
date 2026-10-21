@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import ShopBrowser from '@/components/ShopBrowser'
+import Newsletter from '@/components/Newsletter'
 import { getProducts } from '@/lib/api/products'
 import { CURRENCY } from '@/lib/config'
 
@@ -34,6 +35,7 @@ export default async function ShopPage() {
       </header>
 
       <ShopBrowser products={products} cardImages={{}} />
+      <Newsletter />
     </div>
   )
 }
