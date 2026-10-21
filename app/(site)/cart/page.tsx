@@ -17,7 +17,7 @@ import { CURRENCY } from '@/lib/config'
  * would flash "your cart is empty" at someone who has items.
  */
 export default function CartPage() {
-  const { items, subtotalCents, hydrated, setQuantity, removeItem } = useCart()
+  const { items, subtotalCents, hydrated, storageAvailable, setQuantity, removeItem } = useCart()
   const { toast } = useToast()
   const [confirmingKey, setConfirmingKey] = useState<string | null>(null)
 
@@ -64,6 +64,12 @@ export default function CartPage() {
       </h1>
       <p className="mb-10 font-body-md text-body-md text-on-surface-variant">
         {items.length} {items.length === 1 ? 'line' : 'lines'} · All prices in {CURRENCY}
+      </p>
+
+      <p className="mb-8 font-body-md text-body-md text-on-surface-variant" role="status">
+        {storageAvailable
+          ? 'Your cart is saved in this browser. Come back anytime. No account needed.'
+          : 'Your browser is blocking cart storage. Keep this tab open until you finish checkout.'}
       </p>
 
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1fr_380px]">
@@ -196,7 +202,7 @@ export default function CartPage() {
             href="/checkout"
             className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-primary py-4 font-label-sm text-label-sm text-white transition-opacity hover:opacity-90"
           >
-            Proceed to Checkout
+            Checkout as Guest
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
 

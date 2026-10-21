@@ -44,7 +44,7 @@ const EMPTY: ShippingAddress = {
 }
 
 export default function CheckoutPage() {
-  const { items, subtotalCents, hydrated } = useCart()
+  const { items, subtotalCents, hydrated, startCheckout } = useCart()
 
   const [address, setAddress] = useState<ShippingAddress>(EMPTY)
   const [email, setEmail] = useState('')
@@ -217,6 +217,7 @@ export default function CheckoutPage() {
         )
       }
       // Preserve the cart on payment failure or cancellation. Clear only after verified payment.
+      startCheckout(response.order_id)
       window.location.href = response.checkout_url
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
@@ -260,9 +261,12 @@ export default function CheckoutPage() {
         Back to cart
       </Link>
 
-      <h1 className="mb-10 font-headline-display text-headline-lg-mobile text-primary md:text-headline-lg">
+      <h1 className="mb-2 font-headline-display text-headline-lg-mobile text-primary md:text-headline-lg">
         Checkout
       </h1>
+      <p className="mb-10 font-body-md text-body-md text-on-surface-variant">
+        Guest checkout. No account needed. We’ll email your receipt and order updates.
+      </p>
 
       <form
         onSubmit={handleSubmit}

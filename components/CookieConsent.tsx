@@ -29,9 +29,13 @@ interface Consent {
 export default function CookieConsent() {
   // Seeded lazily on the first client render; `hydrated` keeps the banner hidden until after
   // hydration, so a returning visitor never sees it flash.
-  const [decided, setDecided] = useState(
-    () => typeof window !== 'undefined' && window.localStorage.getItem(STORAGE_KEY) !== null,
-  )
+  const [decided, setDecided] = useState(() => {
+    try {
+      return typeof window !== 'undefined' && window.localStorage.getItem(STORAGE_KEY) !== null
+    } catch {
+      return false
+    }
+  })
   const hydrated = useHydrated()
   const [showPrefs, setShowPrefs] = useState(false)
   const [analytics, setAnalytics] = useState(false)
@@ -71,7 +75,11 @@ export default function CookieConsent() {
       ...next,
       decidedAt: new Date().toISOString(),
     }
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(consent))
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(consent))
+    } catch {
+      // A browser storage restriction must not prevent guest shopping.
+    }
     setDecided(true)
     setShowPrefs(false)
   }

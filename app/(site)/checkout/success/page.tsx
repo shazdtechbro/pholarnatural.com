@@ -12,7 +12,7 @@ function OrderConfirmation() {
     token = params.get('token')
   const [order, setOrder] = useState<ConfirmedOrder | null>(null)
   const [error, setError] = useState('')
-  const { clear } = useCart()
+  const { completeCheckout } = useCart()
   useEffect(() => {
     if (!id || !token) return
     let cancelled = false,
@@ -24,7 +24,7 @@ function OrderConfirmation() {
         if (cancelled) return
         setOrder(record)
         if (['paid', 'confirmed', 'processing', 'shipped', 'delivered'].includes(record.status))
-          clear()
+          completeCheckout(record.id)
         else if (record.status === 'pending' && ++attempts < 30) timer = setTimeout(check, 2000)
       } catch (err) {
         if (!cancelled)
@@ -38,7 +38,7 @@ function OrderConfirmation() {
       cancelled = true
       clearTimeout(timer)
     }
-  }, [id, token, clear])
+  }, [id, token, completeCheckout])
   if (!id || !token)
     return (
       <section className="mx-auto max-w-xl px-5 py-20">

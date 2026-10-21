@@ -128,7 +128,7 @@ export const FAQS: FaqEntry[] = [
     category: 'Payments',
     question: 'Do I need an account to order?',
     answer:
-      'No. Checkout is guest-only — we ask for an email purely so we can send your order confirmation.',
+      'No. Shop and check out as a guest. We ask for your email to send your receipt and order updates. Your cart is saved in the same browser, so it stays when you refresh or return later. Clearing browser data or switching devices will not bring that cart with you.',
   },
   {
     id: 'faq-returns',

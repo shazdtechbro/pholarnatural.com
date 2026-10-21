@@ -84,7 +84,7 @@ export default function Navbar() {
       >
         <Link href="/" className="flex items-center gap-2" aria-label="Pholar Natural — home">
           <Image src="/logo.svg" alt="" width={36} height={36} className="h-9 w-9" priority />
-          <span className="font-headline-md text-[20px] font-bold text-primary md:text-headline-md">
+          <span className="font-headline-md text-[16px] font-bold text-primary sm:text-[20px] md:text-headline-md">
             Pholar Natural
           </span>
         </Link>
@@ -113,9 +113,10 @@ export default function Navbar() {
             aria-label={
               hydrated && count > 0 ? `Cart, ${count} item${count === 1 ? '' : 's'}` : 'Cart, empty'
             }
-            className="relative rounded-full p-2 text-on-surface-variant transition-all hover:bg-surface-container-high/60 hover:text-primary"
+            className="relative inline-flex items-center gap-2 rounded-full p-2 text-on-surface-variant transition-all hover:bg-surface-container-high/60 hover:text-primary"
           >
             <ShoppingBag className="h-5 w-5" aria-hidden="true" />
+            <span className="font-label-sm text-label-sm">Cart</span>
             {hydrated && count > 0 && (
               <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-secondary px-1 text-[10px] font-bold text-white">
                 {count > 99 ? '99+' : count}
@@ -177,11 +178,11 @@ export default function Navbar() {
         </ul>
         <div className="flex flex-col gap-3 px-5 pb-6">
           <Link
-            href="/admin/login"
+            href="/cart"
             tabIndex={open ? undefined : -1}
             className="rounded-full border-2 border-primary py-3 text-center font-label-sm text-label-sm text-primary"
           >
-            Sign In
+            Your Cart{hydrated && count > 0 ? ` (${count})` : ''}
           </Link>
           <Link
             href="/book"
