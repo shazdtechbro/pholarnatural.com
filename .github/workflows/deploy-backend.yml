@@ -6,6 +6,7 @@ on:
     paths:
       - 'server/**'
       - '.github/workflows/deploy-backend.yml'
+      - '.github/vps_known_hosts'
 
 permissions:
   contents: read
@@ -43,31 +44,34 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     steps:
-      - name: Require a verified VPS host key
+      - uses: actions/checkout@v4
+      - name: Deploy with pinned VPS host keys
         env:
-          VPS_SSH_FINGERPRINT: ${{ secrets.VPS_SSH_FINGERPRINT }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USERNAME: ${{ secrets.VPS_USERNAME }}
+          VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        shell: bash
         run: |
-          if [ -z "$VPS_SSH_FINGERPRINT" ]; then
-            echo "::error::Set VPS_SSH_FINGERPRINT from the trusted VPS console before deploying."
-            exit 1
-          fi
-      - name: SSH and deploy
-        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_SSH_PORT }}
-          fingerprint: ${{ secrets.VPS_SSH_FINGERPRINT }}
-          script: |
-            set -eu
-            cd ~/pholarnatural.com/server
-            git pull --ff-only origin main
-            docker compose build api mail-worker
-            docker compose run --rm --no-deps api alembic upgrade head
-            docker compose up -d api mail-worker
-            for attempt in $(seq 1 20); do
-              if curl --fail --silent http://127.0.0.1:8000/health > /dev/null; then exit 0; fi
-              sleep 2
-            done
-            exit 1
+          set -euo pipefail
+          ssh_key_path=$(mktemp)
+          trap 'rm -f "$ssh_key_path"' EXIT
+          chmod 600 "$ssh_key_path"
+          printf '%s\n' "$VPS_SSH_KEY" > "$ssh_key_path"
+          ssh -i "$ssh_key_path" -p "${VPS_SSH_PORT:-22}" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$GITHUB_WORKSPACE/.github/vps_known_hosts" \
+            "$VPS_USERNAME@$VPS_HOST" 'bash -se' <<'DEPLOY'
+          set -eu
+          cd ~/pholarnatural.com/server
+          git pull --ff-only origin main
+          docker compose build api mail-worker
+          docker compose run --rm --no-deps api alembic upgrade head
+          docker compose up -d api mail-worker
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent --max-time 5 http://127.0.0.1:8000/health > /dev/null; then exit 0; fi
+            sleep 2
+          done
+          exit 1
+          DEPLOY
