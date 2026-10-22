@@ -57,6 +57,8 @@ export default function CartPage() {
           Continue Shopping
           <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </Link>
+        {!customer && <p className="mt-6 text-sm text-on-surface-variant">Already have a saved cart? <Link href="/account?next=/cart" className="font-semibold text-primary underline underline-offset-4">Sign in to restore it</Link>.</p>}
+        <CartSyncNotice />
       </div>
     )
   }
