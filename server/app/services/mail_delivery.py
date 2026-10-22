@@ -40,6 +40,15 @@ def process_one(db, sender=None):
         db.commit()
         return True
     if not polling:
+        if job.event_key.startswith("account/") and not job.event_key.endswith("/password-changed"):
+            from app.models.customer import CustomerAction
+            parts = job.event_key.split("/")
+            action = db.get(CustomerAction, parts[1])
+            if not action or action.used or action.expires_at.replace(tzinfo=timezone.utc) <= now:
+                job.status = "cancelled"
+                job.last_error = "Account link expired or was already used"
+                db.commit()
+                return True
         if job.event_key.startswith("newsletter/"):
             from app.models.subscriber import Subscriber
             parts = job.event_key.split("/")

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import localFont from 'next/font/local'
 import './globals.css'
 import ToastViewport from '@/components/Toast'
+import { CustomerProvider } from '@/context/CustomerContext'
 import { CartProvider } from '@/context/CartContext'
 import { ToastProvider } from '@/context/ToastContext'
 import { SITE_URL, BUSINESS } from '@/lib/config'
@@ -73,10 +74,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body className="bg-background font-body-md text-on-surface overflow-x-hidden">
         <ToastProvider>
+          <CustomerProvider>
           <CartProvider>
             {children}
             <ToastViewport />
           </CartProvider>
+          </CustomerProvider>
         </ToastProvider>
       </body>
     </html>

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:cart": "node --experimental-strip-types --test tests/guest-cart.test.mjs"
+    "test:cart": "node --experimental-strip-types --test tests/guest-cart.test.mjs tests/account-cart.test.mjs"
   },
   "dependencies": {
     "@stripe/react-stripe-js": "^6.8.2",

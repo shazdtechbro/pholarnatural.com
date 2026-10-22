@@ -4,7 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { Menu, X, ShoppingBag } from 'lucide-react'
+import { Menu, X, ShoppingBag, UserRound } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 
 /**
@@ -108,6 +108,7 @@ export default function Navbar() {
         </ul>
 
         <div className="flex items-center gap-2 md:gap-4">
+          <Link href="/account" aria-label="My account" className="rounded-full p-2 text-primary hover:bg-surface-container-high/60"><UserRound className="h-5 w-5" aria-hidden="true" /></Link>
           <Link
             href="/cart"
             aria-label={
@@ -177,6 +178,7 @@ export default function Navbar() {
           ))}
         </ul>
         <div className="flex flex-col gap-3 px-5 pb-6">
+          <Link href="/account" tabIndex={open ? undefined : -1} className="py-3 text-center font-semibold text-primary">My account · Sign in or create an account</Link>
           <Link
             href="/cart"
             tabIndex={open ? undefined : -1}

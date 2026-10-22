@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import AccountInvitation from '@/components/AccountInvitation'
 import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { cancelBooking, getBookingConfirmation, type BookingConfirmation } from '@/lib/api/bookings'
@@ -123,6 +124,7 @@ function Confirmation() {
           Contact us
         </Link>
       </p>
+      <AccountInvitation />
     </section>
   )
 }

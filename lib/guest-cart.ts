@@ -36,6 +36,7 @@ export const SERVER_CART = { items: [] as CartItem[], storageAvailable: true }
 
 /** Anonymous browser cart. Writes happen with the action, before a refresh can interrupt it. */
 export function createGuestCartStore(storage: StorageAccess, checkoutStorage: StorageAccess = () => null) {
+  let storageKey = CART_STORAGE_KEY
   let snapshot = SERVER_CART
   let initialized = false
   let lastRaw: string | null = null
@@ -47,7 +48,7 @@ export function createGuestCartStore(storage: StorageAccess, checkoutStorage: St
     try {
       const target = storage()
       if (!target) throw new Error('Storage unavailable')
-      const raw = target.getItem(CART_STORAGE_KEY)
+      const raw = target.getItem(storageKey)
       if (!initialized || raw !== lastRaw) {
         lastRaw = raw
         snapshot = { items: parseCart(raw), storageAvailable: true }
@@ -76,7 +77,7 @@ export function createGuestCartStore(storage: StorageAccess, checkoutStorage: St
       const target = storage()
       if (!target) throw new Error('Storage unavailable')
       const raw = JSON.stringify(items)
-      target.setItem(CART_STORAGE_KEY, raw)
+      target.setItem(storageKey, raw)
       lastRaw = raw
       storageAvailable = true
     } catch {
@@ -89,21 +90,21 @@ export function createGuestCartStore(storage: StorageAccess, checkoutStorage: St
   function startCheckout(id: string) {
     const lines = getSnapshot().items.map(({ variant_id, quantity }) => ({ variant_id, quantity }))
     checkouts.set(id, lines)
-    try { checkoutStorage()?.setItem(`pholar-checkout-${id}`, JSON.stringify(lines)) } catch {}
+    try { checkoutStorage()?.setItem(`pholar-checkout-${storageKey}-${id}`, JSON.stringify(lines)) } catch {}
   }
 
   function completeCheckout(id: string) {
     let lines = checkouts.get(id)
     if (!lines) {
       try {
-        const raw: unknown = JSON.parse(checkoutStorage()?.getItem(`pholar-checkout-${id}`) ?? 'null')
+        const raw: unknown = JSON.parse(checkoutStorage()?.getItem(`pholar-checkout-${storageKey}-${id}`) ?? 'null')
         if (Array.isArray(raw) && raw.every((line) => line && UUID.test(line.variant_id) && Number.isSafeInteger(line.quantity) && line.quantity > 0)) lines = raw
       } catch {}
     }
     // An old email receipt or a checkout from another device must not erase a new cart.
     if (!lines) return
     checkouts.delete(id)
-    try { checkoutStorage()?.removeItem(`pholar-checkout-${id}`) } catch {}
+    try { checkoutStorage()?.removeItem(`pholar-checkout-${storageKey}-${id}`) } catch {}
     const purchased = new Map(lines.map((line) => [line.variant_id, line.quantity]))
     update((items) => items.flatMap((item) => {
       const quantity = item.quantity - (purchased.get(item.variant_id) ?? 0)
@@ -113,6 +114,10 @@ export function createGuestCartStore(storage: StorageAccess, checkoutStorage: St
 
   return {
     getSnapshot, refresh, update, startCheckout, completeCheckout,
+    setScope(key: string) {
+      if (key === storageKey) return
+      storageKey = key; initialized = false; lastRaw = null; snapshot = SERVER_CART; checkouts.clear(); refresh()
+    },
     subscribe(listener: () => void) {
       listeners.add(listener)
       return () => { listeners.delete(listener) }

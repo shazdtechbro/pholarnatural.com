@@ -110,3 +110,47 @@ def test_database_constraints(postgres):
         with pytest.raises(IntegrityError):
             db.commit()
         db.rollback()
+
+
+def test_customer_cart_merge_is_idempotent_across_workers(postgres):
+    from app.api.routes.customer import merge_cart, MergeInput
+    from app.models.customer import Customer
+    customer_id = uuid.uuid4()
+    with postgres() as db:
+        db.add(Customer(id=customer_id, name="Customer", email=str(customer_id)+"@example.com", password_hash="unused-test-hash"))
+        db.commit()
+    operation = MergeInput(operation_id=uuid.uuid4(), items=[{"variant_id": uuid.uuid4(), "quantity": 2}])
+    def merge(_):
+        with postgres() as db:
+            customer = db.get(Customer, customer_id)
+            return merge_cart(operation, customer, db)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        list(pool.map(merge, range(2)))
+    with postgres() as db:
+        customer = db.get(Customer, customer_id)
+        assert customer.cart[0]["quantity"] == 2
+        assert customer.cart_version == 1
+
+
+def test_customer_reset_link_can_only_be_used_by_one_worker(postgres):
+    from app.api.routes.customer import reset, ResetInput, digest
+    from app.models.customer import Customer, CustomerAction
+    from app.services.mail_delivery import utcnow
+    from datetime import timedelta
+    customer_id = uuid.uuid4()
+    raw = uuid.uuid4().hex + uuid.uuid4().hex
+    with postgres() as db:
+        db.add(Customer(id=customer_id, name="Customer", email=str(customer_id)+"@example.com", password_hash="unused-test-hash"))
+        db.flush()
+        db.add(CustomerAction(token_hash=digest(raw), customer_id=customer_id, purpose="reset", created_at=utcnow(), expires_at=utcnow()+timedelta(minutes=30)))
+        db.commit()
+    def use(_):
+        with postgres() as db:
+            try:
+                reset(ResetInput(token=raw, password="long test only password"), db)
+                return 200
+            except HTTPException as error:
+                return error.status_code
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(use, range(2)))
+    assert sorted(results) == [200, 400]

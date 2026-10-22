@@ -50,3 +50,5 @@ watchfiles==1.2.0
 websockets==16.1
 PyJWT==2.15.1
 tzdata==2026.5
+
+argon2-cffi==25.1.0

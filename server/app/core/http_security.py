@@ -17,7 +17,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             600
             if "/webhooks/" in path
             else 10
-            if path.endswith(("/login", "/register"))
+            if path.endswith(("/login", "/register", "/forgot-password", "/reset-password", "/verify", "/resend-verification"))
             else 15
             if path.startswith("/api/v1/contact")
             else 60
@@ -28,7 +28,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             "webhooks"
             if "/webhooks/" in path
             else "auth"
-            if path.endswith(("/login", "/register"))
+            if path.endswith(("/login", "/register", "/forgot-password", "/reset-password", "/verify", "/resend-verification"))
             else "contact"
             if path.startswith("/api/v1/contact")
             else request.method

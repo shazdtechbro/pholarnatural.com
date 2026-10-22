@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import AccountInvitation from '@/components/AccountInvitation'
 import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { getOrderConfirmation, type ConfirmedOrder } from '@/lib/api/orders'
@@ -48,7 +49,8 @@ function OrderConfirmation() {
           this page.
         </p>
         <Link href="/cart">Return to cart</Link>
-      </section>
+        <AccountInvitation />
+    </section>
     )
   if (error)
     return (
@@ -56,7 +58,8 @@ function OrderConfirmation() {
         <h1>We could not verify this order</h1>
         <p>{error}</p>
         <Link href="/contact">Contact us</Link>
-      </section>
+        <AccountInvitation />
+    </section>
     )
   if (!order)
     return (
@@ -114,6 +117,7 @@ function OrderConfirmation() {
       <Link href="/shop" className="underline">
         Continue shopping
       </Link>
+      <AccountInvitation />
     </section>
   )
 }

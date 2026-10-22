@@ -27,7 +27,7 @@ function PurchasableDetail({
   const [imageIndex, setImageIndex] = useState(0)
 
   const variant = activeVariants.find((v) => v.id === variantId) ?? firstInStock
-  const { addItem } = useCart()
+  const { addItem, canEdit } = useCart()
   const { toast } = useToast()
   const groupId = useId()
   const qtyId = useId()
@@ -183,7 +183,7 @@ function PurchasableDetail({
               min={1}
               max={maxQty}
               value={quantity}
-              disabled={outOfStock}
+              disabled={outOfStock || !canEdit}
               onChange={(e) => {
                 const n = Number(e.target.value)
                 if (Number.isFinite(n)) setQuantity(Math.min(Math.max(1, Math.floor(n)), maxQty))
@@ -204,7 +204,7 @@ function PurchasableDetail({
 
         <button
           type="button"
-          disabled={outOfStock}
+          disabled={outOfStock || !canEdit}
           onClick={() => {
             addItem(product, variant, quantity)
             toast(`${quantity} × ${product.name} (${variant.weight_label}) added to your cart`)
@@ -212,7 +212,7 @@ function PurchasableDetail({
           className="mt-8 flex w-full items-center justify-center gap-2 rounded-full bg-primary py-4 font-label-sm text-label-sm text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <ShoppingCart className="h-4 w-4" aria-hidden="true" />
-          {outOfStock ? 'Out of Stock' : 'Add to Cart'}
+          {outOfStock ? 'Out of Stock' : !canEdit ? 'Loading cart…' : 'Add to Cart'}
         </button>
 
         <div className="mt-10 space-y-4 border-t border-outline-variant pt-8">

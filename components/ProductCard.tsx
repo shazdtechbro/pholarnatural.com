@@ -29,7 +29,7 @@ export default function ProductCard({ product, imageUrl, priority = false }: Pro
   const firstInStock = activeVariants.find((v) => v.stock_count > 0) ?? activeVariants[0]
   const [variantId, setVariantId] = useState(firstInStock?.id ?? '')
   const variant = activeVariants.find((v) => v.id === variantId) ?? firstInStock
-  const { addItem } = useCart()
+  const { addItem, canEdit } = useCart()
   const { toast } = useToast()
   const groupId = useId()
 
@@ -121,7 +121,7 @@ export default function ProductCard({ product, imageUrl, priority = false }: Pro
           <div className="mt-auto space-y-2">
             <button
               type="button"
-              disabled={outOfStock}
+              disabled={outOfStock || !canEdit}
               onClick={() => {
                 if (variant) addItem(product, variant)
                 toast(`${product.name} (${variant.weight_label}) added to your cart`)
@@ -129,7 +129,7 @@ export default function ProductCard({ product, imageUrl, priority = false }: Pro
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-surface-container-highest py-3 font-label-sm text-label-sm text-primary transition-all hover:bg-primary hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-surface-container-highest disabled:hover:text-primary"
             >
               <Plus className="h-4 w-4" aria-hidden="true" />
-              {outOfStock ? 'Out of Stock' : 'Add to Cart'}
+              {outOfStock ? 'Out of Stock' : !canEdit ? 'Loading cart…' : 'Add to Cart'}
             </button>
             <Link
               href={`/shop/${product.slug}`}

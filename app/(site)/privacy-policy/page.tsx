@@ -15,7 +15,7 @@ export default function PrivacyPolicyPage() {
     <PolicyPage
       title="Privacy Policy"
       intro="What we collect, why we collect it, and what you can ask us to do about it."
-      lastUpdated="11 August 2026"
+      lastUpdated="21 October 2026"
     >
       <h2>What we collect</h2>
       <p>We only collect what we need to sell you a product or hold your appointment.</p>
@@ -41,6 +41,9 @@ export default function PrivacyPolicyPage() {
         Stripe and card data never reaches our servers.
       </p>
 
+      <h2>Optional accounts</h2>
+      <p>If you choose to create an account, we store your name, email address, a secure password hash, saved cart and sign-in sessions. We never store your password in plain text. A secure, HttpOnly session cookie keeps you signed in for up to 30 days. Verification and password-reset emails help protect your account; creating an account does not subscribe you to marketing.</p>
+      <p>After you verify your email, your account shows bookings and orders placed with that email, including guest purchases. You can continue to shop and book without an account. Contact us to request account deletion.</p>
       <h2>Why we collect it</h2>
       <ul>
         <li>To fulfil and deliver your order, and to email you its confirmation</li>
@@ -65,8 +68,7 @@ export default function PrivacyPolicyPage() {
         </li>
       </ul>
       <p>
-        Your cart is stored in your own browser&apos;s local storage, not on our servers. Clearing
-        your browser data clears your cart.
+        Guest carts are stored in your browser&apos;s local storage. Clearing browser data clears a guest cart. If you sign in, your cart is also saved on our servers so you can return on another device. Temporary local drafts protect cart changes during connection problems.
       </p>
 
       <h2>Who we share data with</h2>

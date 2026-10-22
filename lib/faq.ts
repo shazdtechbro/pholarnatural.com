@@ -128,7 +128,7 @@ export const FAQS: FaqEntry[] = [
     category: 'Payments',
     question: 'Do I need an account to order?',
     answer:
-      'No. Shop and check out as a guest. We ask for your email to send your receipt and order updates. Your cart is saved in the same browser, so it stays when you refresh or return later. Clearing browser data or switching devices will not bring that cart with you.',
+      'No. You can shop and check out as a guest, with your cart saved in the same browser. For a cart that follows you across devices, create an optional account with your email and password. Verify your email to see your bookings and orders, including past guest purchases made with that email.',
   },
   {
     id: 'faq-returns',

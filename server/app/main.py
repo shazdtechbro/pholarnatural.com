@@ -90,7 +90,7 @@ if not settings.CORS_ORIGINS and _local.hostname in ("localhost", "127.0.0.1"):
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Confirmation-Token"],
 )
@@ -146,3 +146,6 @@ def health():
 
 from app.api.routes import newsletter
 app.include_router(newsletter.router, prefix="/api/v1/newsletter", tags=["Newsletter"])
+
+from app.api.routes import customer
+app.include_router(customer.router, prefix="/api/v1/account", tags=["Customer Accounts"])

@@ -10,6 +10,9 @@ import {
   type ReactNode,
 } from 'react'
 import { usePathname } from 'next/navigation'
+import { useCustomer } from '@/context/CustomerContext'
+import { accountApi } from '@/lib/api/customer'
+import { createAccountCartSync, INITIAL_SYNC } from '@/lib/account-cart'
 import { getProducts } from '@/lib/api/products'
 import type { CartItem, Product, ProductVariant } from '@/lib/types'
 import { useHydrated } from '@/lib/use-hydrated'
@@ -20,11 +23,13 @@ const cartStore = createGuestCartStore(
   () => typeof window === 'undefined' ? null : window.localStorage,
   () => typeof window === 'undefined' ? null : window.sessionStorage,
 )
+const accountSync = createAccountCartSync(cartStore, accountApi, () => typeof window === 'undefined' ? null : window.localStorage, CART_STORAGE_KEY)
+const getServerSyncSnapshot = () => INITIAL_SYNC
 const getServerSnapshot = () => SERVER_CART
 function subscribeToCart(listener: () => void) {
   const unsubscribe = cartStore.subscribe(listener)
   const onStorage = (event: StorageEvent) => {
-    if (event.key === CART_STORAGE_KEY || event.key === null) cartStore.refresh()
+    if (accountSync.getSnapshot().owner === null && (event.key === CART_STORAGE_KEY || event.key === null)) cartStore.refresh()
   }
   window.addEventListener('storage', onStorage)
   cartStore.refresh()
@@ -45,6 +50,11 @@ interface CartContextValue {
    */
   hydrated: boolean
   storageAvailable: boolean
+  canEdit: boolean
+  syncStatus: string
+  syncMessage: string
+  retrySave: () => Promise<void>
+  reloadSavedCart: () => Promise<void>
   startCheckout: (orderId: string) => void
   completeCheckout: (orderId: string) => void
   addItem: (product: Product, variant: ProductVariant, quantity?: number) => void
@@ -61,9 +71,14 @@ function keyFor(productId: string, variantId: string) {
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname()
+  const { customer, ready } = useCustomer()
+  const syncState = useSyncExternalStore(accountSync.subscribe, accountSync.getSnapshot, getServerSyncSnapshot)
+  useEffect(() => { if (ready) void accountSync.activate(customer?.id ?? null) }, [ready, customer?.id])
+  useEffect(() => { const focus = () => { if (accountSync.getSnapshot().status === 'saved') void accountSync.reload() }; window.addEventListener('focus', focus); return () => window.removeEventListener('focus', focus) }, [])
   const { items, storageAvailable } = useSyncExternalStore(subscribeToCart, cartStore.getSnapshot, getServerSnapshot)
-  const hydrated = useHydrated()
-  const setItems = cartStore.update
+  const browserReady = useHydrated()
+  const hydrated = browserReady && ready && syncState.owner === (customer?.id ?? null) && syncState.status !== 'loading'
+  const setItems = accountSync.update
 
   useEffect(() => {
     if (pathname.startsWith('/admin')) return
@@ -77,7 +92,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
             product.variants.map((variant) => [variant.id, { product, variant }] as const),
           ),
         )
-        setItems((previous) =>
+        cartStore.update((previous) =>
           previous.flatMap((item) => {
             const current = variants.get(item.variant_id)
             if (!current || current.variant.stock_count <= 0) return []
@@ -165,14 +180,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
       subtotalCents,
       hydrated,
       storageAvailable,
+      canEdit: hydrated && syncState.status !== 'blocked',
+      syncStatus: syncState.status,
+      syncMessage: syncState.message,
+      retrySave: accountSync.retry,
+      reloadSavedCart: accountSync.reload,
       startCheckout: cartStore.startCheckout,
-      completeCheckout: cartStore.completeCheckout,
+      completeCheckout: accountSync.completeCheckout,
       addItem,
       removeItem,
       setQuantity,
       clear,
     }
-  }, [items, hydrated, storageAvailable, addItem, removeItem, setQuantity, clear])
+  }, [items, hydrated, storageAvailable, syncState, addItem, removeItem, setQuantity, clear])
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>
 }

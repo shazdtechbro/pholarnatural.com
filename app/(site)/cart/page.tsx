@@ -4,6 +4,8 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useState } from 'react'
 import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from 'lucide-react'
+import { useCustomer } from '@/context/CustomerContext'
+import { CartSyncNotice } from '@/components/CustomerAccount'
 import { useCart } from '@/context/CartContext'
 import { useToast } from '@/context/ToastContext'
 import { formatPrice } from '@/lib/format'
@@ -18,6 +20,8 @@ import { CURRENCY } from '@/lib/config'
  */
 export default function CartPage() {
   const { items, subtotalCents, hydrated, storageAvailable, setQuantity, removeItem } = useCart()
+  const { customer } = useCustomer()
+  const { syncStatus } = useCart()
   const { toast } = useToast()
   const [confirmingKey, setConfirmingKey] = useState<string | null>(null)
 
@@ -68,10 +72,12 @@ export default function CartPage() {
 
       <p className="mb-8 font-body-md text-body-md text-on-surface-variant" role="status">
         {storageAvailable
-          ? 'Your cart is saved in this browser. Come back anytime. No account needed.'
+          ? customer ? syncStatus === 'saved' ? 'Your cart is saved to your account.' : syncStatus === 'saving' ? 'Saving your cart to your account...' : 'Your cart is kept in this browser while we reconnect.' : 'Your cart is saved in this browser. No account needed.'
           : 'Your browser is blocking cart storage. Keep this tab open until you finish checkout.'}
       </p>
 
+      <CartSyncNotice />
+      {!customer && <p className="mb-8 rounded-xl bg-primary/5 p-4 text-sm leading-6">Want your cart on every device? <Link className="font-semibold text-primary underline" href="/account?next=/cart">Sign in</Link> or <Link className="font-semibold text-primary underline" href="/account/register?next=/cart">create an optional account</Link>.</p>}
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1fr_380px]">
         <ul className="space-y-4">
           {items.map((item) => {
@@ -202,7 +208,7 @@ export default function CartPage() {
             href="/checkout"
             className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-primary py-4 font-label-sm text-label-sm text-white transition-opacity hover:opacity-90"
           >
-            Checkout as Guest
+            {customer ? 'Continue to Checkout' : 'Checkout as Guest'}
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
 

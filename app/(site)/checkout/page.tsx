@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { Lock, AlertCircle, ArrowLeft, Loader2, Tag, X } from 'lucide-react'
 import { Field, FieldSet } from '@/components/FormField'
+import { CartSyncNotice } from '@/components/CustomerAccount'
+import { useCustomer } from '@/context/CustomerContext'
 import { useCart } from '@/context/CartContext'
 import { formatPrice } from '@/lib/format'
 import { CURRENCY } from '@/lib/config'
@@ -44,10 +46,16 @@ const EMPTY: ShippingAddress = {
 }
 
 export default function CheckoutPage() {
-  const { items, subtotalCents, hydrated, startCheckout } = useCart()
+  const { ready } = useCustomer()
+  return ready ? <CheckoutForm /> : <p className="px-5 py-20 text-center" role="status">Loading checkout…</p>
+}
 
-  const [address, setAddress] = useState<ShippingAddress>(EMPTY)
-  const [email, setEmail] = useState('')
+function CheckoutForm() {
+  const { items, subtotalCents, hydrated, canEdit, startCheckout } = useCart()
+
+  const { customer } = useCustomer()
+  const [address, setAddress] = useState<ShippingAddress>(() => ({ ...EMPTY, full_name: customer?.name ?? '' }))
+  const [email, setEmail] = useState(customer?.email ?? '')
   const [errors, setErrors] = useState<Errors>({})
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -232,6 +240,8 @@ export default function CheckoutPage() {
       </p>
     )
 
+  if (!canEdit) return <div className="mx-auto max-w-2xl px-5 py-16"><h1 className="font-headline-display text-2xl text-primary">Let’s reconnect your cart</h1><CartSyncNotice /><Link href="/cart" className="text-primary underline">Back to cart</Link></div>
+
   if (items.length === 0) {
     return (
       <div className="mx-auto max-w-3xl px-5 py-24 text-center md:px-16">
@@ -265,7 +275,7 @@ export default function CheckoutPage() {
         Checkout
       </h1>
       <p className="mb-10 font-body-md text-body-md text-on-surface-variant">
-        Guest checkout. No account needed. We’ll email your receipt and order updates.
+        {customer ? `Checking out as ${customer.email}. We’ll email your receipt and order updates.` : <>Guest checkout. No account needed. <Link href="/account?next=/checkout" className="font-semibold text-primary underline">Sign in</Link> to use your saved cart, or continue below.</>}
       </p>
 
       <form

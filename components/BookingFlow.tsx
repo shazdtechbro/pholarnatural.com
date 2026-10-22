@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useCustomer } from '@/context/CustomerContext'
 import { useEffect, useMemo, useState } from 'react'
 import {
   Check,
@@ -177,8 +178,11 @@ export default function BookingFlow({ services, blockedDates }: BookingFlowProps
   const slots = slotsFor?.key === slotsKey ? slotsFor.slots : []
   const loadingSlots = slotsKey !== null && slotsFor?.key !== slotsKey
 
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
+  const { customer } = useCustomer()
+  const [nameDraft, setName] = useState<string | null>(null)
+  const name = nameDraft ?? customer?.name ?? ''
+  const [emailDraft, setEmail] = useState<string | null>(null)
+  const email = emailDraft ?? customer?.email ?? ''
   const [phone, setPhone] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
