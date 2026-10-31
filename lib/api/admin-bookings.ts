@@ -11,6 +11,7 @@ export interface AdminBooking {
   start_time: string
   end_time: string
   status: string
+  currency?: string
   deposit_cents: number
   cancellation_reason: string | null
   reference: string

@@ -27,7 +27,7 @@ router = APIRouter()
 hasher = PasswordHasher(time_cost=2, memory_cost=19456, parallelism=1)
 DUMMY_HASH = hasher.hash(secrets.token_urlsafe(32))
 SECURE = settings.DOMAIN.startswith("https://")
-COOKIE = "__Host-pholar_customer" if SECURE else "pholar_customer"
+COOKIE = ("__Host-" if SECURE else "") + ("pholar_sandbox_customer" if settings.PAYMENT_SANDBOX_INSTANCE else "pholar_customer")
 
 
 def digest(value):
@@ -285,6 +285,6 @@ def history(customer: Customer = Depends(current), db: Session = Depends(get_db)
     orders = db.query(Order).filter(func.lower(Order.customer_email) == customer.email).order_by(Order.created_at.desc()).limit(100).all()
     bookings = db.query(Booking).filter(func.lower(Booking.customer_email) == customer.email).order_by(Booking.booking_date.desc()).limit(100).all()
     return {
-        "orders": [{"id": str(o.id), "reference": str(o.id)[:8].upper(), "date": o.created_at.isoformat(), "status": o.status, "total_cents": o.total_cents, "url": f"/checkout/success?id={o.id}&token={customer_token('order', o.id)}"} for o in orders],
+        "orders": [{"id": str(o.id), "reference": str(o.id)[:8].upper(), "date": o.created_at.isoformat(), "status": o.status, "total_cents": o.total_cents, "currency": o.currency, "url": f"/checkout/success?id={o.id}&token={customer_token('order', o.id)}"} for o in orders],
         "bookings": [{"id": str(b.id), "service": b.service.name, "date": str(b.booking_date), "time": str(b.start_time)[:5], "status": b.status, "deposit_cents": b.deposit_cents, "url": f"/book/confirmation?id={b.id}&token={customer_token('booking', b.id)}"} for b in bookings],
     }

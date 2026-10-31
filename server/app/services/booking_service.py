@@ -110,8 +110,17 @@ def get_available_slots(db, target_date, service_id=None):
     return result
 
 
-def create_booking_with_payment_intent(db, booking_in, payment_gateway):
+def create_booking_with_payment_intent(db, booking_in, payment_gateway, request_key=None):
     transaction_lock(db, 903)
+    from app.services.payment_records import request_identity, existing_request, initialize, resume_bachs
+    key, fingerprint = request_identity(booking_in, request_key)
+    existing = existing_request(db, Booking, key, fingerprint)
+    if existing:
+        if existing.payment_provider == "bachs":
+            return existing, resume_bachs(db, existing, payment_gateway)
+        if existing.status == "pending" and existing.stripe_payment_intent_id:
+            return existing, payment_gateway.retrieve_payment_intent(existing.stripe_payment_intent_id)["client_secret"]
+        raise HTTPException(409, "This booking checkout is no longer open.")
     svc = (
         db.query(Service)
         .filter(Service.id == booking_in.service_id, Service.is_active == True)
@@ -130,12 +139,15 @@ def create_booking_with_payment_intent(db, booking_in, payment_gateway):
     booking = Booking(
         **booking_in.model_dump(), end_time=end, status="pending", deposit_cents=deposit
     )
+    initialize(booking, key, fingerprint)
     db.add(booking)
     db.flush()
+    if getattr(payment_gateway, "provider", "stripe") == "bachs":
+        return booking, resume_bachs(db, booking, payment_gateway)
     try:
         result = payment_gateway.create_payment_intent(
             amount_cents=deposit,
-            currency="cad",
+            currency=settings.PRICING_CURRENCY.lower(),
             metadata={"type": "booking_deposit", "booking_id": str(booking.id)},
             customer_email=str(booking_in.customer_email),
         )
@@ -148,12 +160,14 @@ def create_booking_with_payment_intent(db, booking_in, payment_gateway):
     return booking, result["client_secret"]
 
 
-def confirm_booking_payment_intent(db, payment_intent_id, payment_gateway=None):
+def confirm_booking_payment_intent(db, payment_intent_id, payment_gateway=None, provider="stripe"):
     transaction_lock(db, 903)
     booking = (
         db.query(Booking)
         .options(joinedload(Booking.service))
-        .filter(Booking.stripe_payment_intent_id == payment_intent_id)
+        .filter((Booking.payment_charge_id == payment_intent_id) if provider == "bachs" else (Booking.stripe_payment_intent_id == payment_intent_id))
+        .populate_existing()
+        .with_for_update(of=Booking)
         .first()
     )
     if not booking or booking.status in (
@@ -176,7 +190,8 @@ def confirm_booking_payment_intent(db, payment_intent_id, payment_gateway=None):
     except HTTPException:
         if not payment_gateway:
             raise
-        refund = payment_gateway.create_refund(payment_intent_id)
+        from app.services.payment_records import refund_record
+        refund = refund_record(db, booking, payment_gateway)
         if refund.get("status") not in ("pending", "succeeded"):
             raise HTTPException(502, "Late payment requires reconciliation.")
         booking.status = (
@@ -275,7 +290,8 @@ def cancel_booking(
             if not payment_gateway:
                 raise HTTPException(409, "Refund service required.")
             try:
-                result = payment_gateway.create_refund(booking.stripe_payment_intent_id)
+                from app.services.payment_records import refund_record
+                result = refund_record(db, booking, payment_gateway)
             except Exception:
                 raise HTTPException(
                     502, "Refund request failed. Booking has not been cancelled."

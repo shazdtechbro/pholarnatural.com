@@ -1,3 +1,4 @@
+from app.models.payment import PaymentFields
 import uuid
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean
 from sqlalchemy.dialects.postgresql import (
@@ -24,7 +25,8 @@ class Discount(Base):
     is_active = Column(Boolean, default=True)
 
 
-class Order(Base):
+class Order(PaymentFields, Base):
+    payment_fulfilled = Column(Boolean, nullable=False, default=False, server_default="false")
     __tablename__ = "orders"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

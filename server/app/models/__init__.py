@@ -9,3 +9,5 @@ from app.models.notification import EmailDelivery
 from app.models.subscriber import Subscriber
 
 from app.models.customer import Customer, CustomerSession, CustomerAction, CustomerCartMerge
+
+from app.models.payment import PaymentEvent

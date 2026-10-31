@@ -58,8 +58,17 @@ def _get_tax_rate(db):
     return float(get_setting(db, "tax_rate_percent", "13"))
 
 
-def create_order_checkout(db, order_in, payment_gateway):
+def create_order_checkout(db, order_in, payment_gateway, request_key=None):
     transaction_lock(db, 902)
+    from app.services.payment_records import request_identity, existing_request, initialize, resume_bachs
+    key, fingerprint = request_identity(order_in, request_key)
+    existing = existing_request(db, Order, key, fingerprint)
+    if existing:
+        if existing.payment_provider == "bachs":
+            return existing, resume_bachs(db, existing, payment_gateway)
+        if existing.status == "pending" and existing.payment_checkout_url:
+            return existing, existing.payment_checkout_url
+        raise HTTPException(409, "This checkout is no longer open.")
     ids = [i.variant_id for i in order_in.items]
     variants = (
         db.query(ProductVariant)
@@ -168,15 +177,18 @@ def create_order_checkout(db, order_in, payment_gateway):
         discount_id=discount.id if discount else None,
         items=items,
     )
+    initialize(order, key, fingerprint)
     db.add(order)
     db.flush()
+    if getattr(payment_gateway, "provider", "stripe") == "bachs":
+        return order, resume_bachs(db, order, payment_gateway)
     token = customer_token("order", order.id)
     try:
         session = payment_gateway.create_checkout_session(
             line_items=[
                 {
                     "price_data": {
-                        "currency": "cad",
+                        "currency": settings.PRICING_CURRENCY.lower(),
                         "unit_amount": total,
                         "product_data": {
                             "name": "Pholar Natural order",
@@ -201,16 +213,18 @@ def create_order_checkout(db, order_in, payment_gateway):
             "Payment setup unavailable. Your cart has been preserved; please retry.",
         )
     order.stripe_session_id = session["session_id"]
+    order.payment_checkout_url = session["url"]
     db.commit()
     db.refresh(order)
     return order, session["url"]
 
 
-def confirm_order_payment(db, session_id, payment_intent_id=None):
+def confirm_order_payment(db, session_id, payment_intent_id=None, provider="stripe"):
     transaction_lock(db, 902)
     order = (
         db.query(Order)
-        .filter(Order.stripe_session_id == session_id)
+        .filter((Order.payment_checkout_id == session_id) if provider == "bachs" else (Order.stripe_session_id == session_id))
+        .populate_existing()
         .with_for_update()
         .first()
     )
@@ -236,8 +250,12 @@ def confirm_order_payment(db, session_id, payment_intent_id=None):
     ):
         # Never silently oversell. Stripe retries until the exceptional payment is refunded.
         raise HTTPException(409, "Inventory changed; payment requires reconciliation.")
-    order.stripe_payment_intent_id = payment_intent_id
+    if provider == "bachs":
+        order.payment_charge_id = payment_intent_id
+    else:
+        order.stripe_payment_intent_id = payment_intent_id
     order.status = "paid"
+    order.payment_fulfilled = True
     for item in order.items:
         variants[item.product_variant_id].stock_count -= item.quantity
     if order.discount_id:
@@ -255,7 +273,7 @@ def confirm_order_payment(db, session_id, payment_intent_id=None):
 
     notify(
         NotificationEvent.NEW_ORDER,
-        f"New paid order PN-{str(order.id)[:8].upper()}: CAD ${order.total_cents / 100:.2f}",
+        f"New paid order PN-{str(order.id)[:8].upper()}: {order.currency} ${order.total_cents / 100:.2f}",
         db,
     )
     for item in order.items:
@@ -301,13 +319,14 @@ def update_order_status(db, order_id, status_in, payment_gateway=None):
     if target not in transitions.get(order.status, set()):
         raise HTTPException(409, "Invalid order status transition.")
     if target == "cancelled" and order.status in PAID_STATUSES:
-        if not payment_gateway or not order.stripe_payment_intent_id:
+        if not payment_gateway or not (order.stripe_payment_intent_id or order.payment_charge_id):
             raise HTTPException(
                 409,
                 "Payment details required for a refund; reconcile the payment before cancelling.",
             )
         try:
-            result = payment_gateway.create_refund(order.stripe_payment_intent_id)
+            from app.services.payment_records import refund_record
+            result = refund_record(db, order, payment_gateway)
         except Exception:
             raise HTTPException(
                 502, "Refund could not be requested. Order remains unchanged."
@@ -317,7 +336,8 @@ def update_order_status(db, order_id, status_in, payment_gateway=None):
                 502, "Refund was not accepted. Order remains unchanged."
             )
         target = "refunded" if result["status"] == "succeeded" else "refund_pending"
-        if target == "refunded":
+        if target == "refunded" and order.payment_fulfilled:
+            order.payment_fulfilled = False
             for item in order.items:
                 variant = (
                     db.query(ProductVariant)

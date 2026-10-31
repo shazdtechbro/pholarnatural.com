@@ -81,6 +81,7 @@ export interface Booking {
   start_time: string
   end_time: string
   status: BookingStatus
+  currency?: string
   deposit_cents: Cents
   stripe_payment_intent_id: string | null
   cancellation_reason: string | null

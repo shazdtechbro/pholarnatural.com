@@ -408,7 +408,7 @@ export default function AdminBookingsPage() {
                         {formatTime(b.start_time)}–{formatTime(b.end_time)}
                       </span>
                     </Td>
-                    <Td>{formatPrice(b.deposit_cents)}</Td>
+                    <Td>{formatPrice(b.deposit_cents, b.currency)}</Td>
                     <Td>
                       <StatusBadge status={b.status} />
                       {b.cancellation_reason && (

@@ -28,7 +28,7 @@ export interface AdminOrder {
   shipping_cents: number
   discount_cents: number
   tax_cents: number
-  total_cents: number
+  currency?: string; total_cents: number
   status: string
   created_at: string
   items: AdminOrderItem[]

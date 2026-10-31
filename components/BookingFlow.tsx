@@ -6,7 +6,7 @@ import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCustomer } from '@/context/CustomerContext'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import {
   Check,
   ChevronLeft,
@@ -143,7 +143,7 @@ function PaymentStep(props: PaymentStepProps) {
     <Elements
       stripe={stripePromise}
       options={{
-        clientSecret: props.depositResponse.client_secret,
+        clientSecret: props.depositResponse.client_secret ?? undefined,
         appearance: { theme: 'stripe' },
       }}
     >
@@ -185,6 +185,7 @@ export default function BookingFlow({ services, blockedDates }: BookingFlowProps
   const email = emailDraft ?? customer?.email ?? ''
   const [phone, setPhone] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const paymentRequest = useRef<{ body: string; id: string } | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
@@ -230,14 +231,18 @@ export default function BookingFlow({ services, blockedDates }: BookingFlowProps
     setSubmitError(null)
 
     try {
-      const response = await createBooking({
+      const body = {
         service_id: service.id,
         customer_name: name,
         customer_email: email,
         customer_phone: phone || null,
         booking_date: date,
         start_time: time,
-      })
+      }
+      const serialized = JSON.stringify(body)
+      if (paymentRequest.current?.body !== serialized) paymentRequest.current = { body: serialized, id: crypto.randomUUID() }
+      const response = await createBooking(body, paymentRequest.current.id)
+      if (response.checkout_url) { window.location.assign(response.checkout_url); return }
       setDepositResponse(response)
       setStep(4)
     } catch (err) {

@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Lock, AlertCircle, ArrowLeft, Loader2, Tag, X } from 'lucide-react'
 import { Field, FieldSet } from '@/components/FormField'
 import { CartSyncNotice } from '@/components/CustomerAccount'
@@ -57,6 +57,7 @@ function CheckoutForm() {
   const [address, setAddress] = useState<ShippingAddress>(() => ({ ...EMPTY, full_name: customer?.name ?? '' }))
   const [email, setEmail] = useState(customer?.email ?? '')
   const [errors, setErrors] = useState<Errors>({})
+  const paymentRequest = useRef<{ body: string; id: string } | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -198,7 +199,7 @@ function CheckoutForm() {
     setSubmitting(true)
 
     try {
-      const response = await createOrder({
+      const payload = {
         customer_name: address.full_name,
         customer_email: email,
         shipping_address: {
@@ -212,13 +213,16 @@ function CheckoutForm() {
         },
         items: items.map((i) => ({ variant_id: i.variant_id, quantity: i.quantity })),
         discount_code: appliedDiscount?.code,
-      })
+      }
+      const serialized = JSON.stringify(payload)
+      if (paymentRequest.current?.body !== serialized) paymentRequest.current = { body: serialized, id: crypto.randomUUID() }
+      const response = await createOrder(payload, paymentRequest.current.id)
 
       if (
         !response.confirmation_token ||
         !response.checkout_url ||
         new URL(response.checkout_url).protocol !== 'https:' ||
-        new URL(response.checkout_url).hostname !== 'checkout.stripe.com'
+        !['checkout.stripe.com', 'checkout.bachs.io', 'sandbox-checkout.bachs.io'].includes(new URL(response.checkout_url).hostname)
       ) {
         throw new Error(
           'Checkout is temporarily unavailable. Please refresh and try again shortly.',
@@ -521,7 +525,7 @@ function CheckoutForm() {
           </dl>
 
           <p className="mt-4 rounded-xl bg-surface-container-lowest px-4 py-3 font-body-md text-[12px] text-on-surface-variant">
-            You&apos;ll complete payment on Stripe&apos;s secure hosted page. Your card details
+            You&apos;ll complete payment on the payment provider&apos;s secure hosted page. Your card details
             never touch our servers.
           </p>
 
@@ -538,7 +542,7 @@ function CheckoutForm() {
             ) : (
               <>
                 <Lock className="h-4 w-4" aria-hidden="true" />
-                Pay with Stripe
+                Continue to secure payment
               </>
             )}
           </button>

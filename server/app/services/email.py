@@ -25,8 +25,8 @@ def e(value):
     return escape(str(value if value is not None else ""), quote=True)
 
 
-def cad(value):
-    return f"CAD ${value / 100:,.2f}"
+def cad(value, currency="CAD"):
+    return f"{currency} ${value / 100:,.2f}"
 
 
 def message(title, lines):
@@ -45,6 +45,13 @@ def message(title, lines):
 
 
 def queue_email(db, key, recipient, subject, html):
+    if settings.PAYMENT_SANDBOX_INSTANCE:
+        subject = "[SANDBOX] " + subject
+        # Keep composed emails inspectable without delivering test receipts or reminders.
+        if not settings.PAYMENT_NOTIFICATIONS_ENABLED:
+            if not any(isinstance(row, EmailDelivery) and row.event_key == key for row in db.new) and not db.query(EmailDelivery.id).filter_by(event_key=key).first():
+                db.add(EmailDelivery(event_key=key, recipient=recipient, subject=subject[:255], html=html, status="sandbox"))
+            return
     if (
         not recipient
         or any(
@@ -89,10 +96,10 @@ def order_confirmation_email(order):
     lines = [
         f"Order PN-{str(order.id)[:8].upper()} is paid.",
         *[
-            f"{i.product_name} ({i.variant_label or 'Standard'}) × {i.quantity}: {cad(i.unit_price_cents * i.quantity)}"
+            f"{i.product_name} ({i.variant_label or 'Standard'}) × {i.quantity}: {cad(i.unit_price_cents * i.quantity, order.currency)}"
             for i in order.items
         ],
-        f"Subtotal: {cad(order.subtotal_cents)}; discount: {cad(order.discount_cents)}; shipping: {cad(order.shipping_cents)}; tax: {cad(order.tax_cents)}; total: {cad(order.total_cents)}",
+        f"Subtotal: {cad(order.subtotal_cents, order.currency)}; discount: {cad(order.discount_cents, order.currency)}; shipping: {cad(order.shipping_cents, order.currency)}; tax: {cad(order.tax_cents, order.currency)}; total: {cad(order.total_cents, order.currency)}",
         "Shipping to: " + ", ".join(str(v) for v in address.values() if v),
         "We will email you as your order progresses.",
     ]
@@ -114,7 +121,7 @@ def booking_confirmation_email(booking):
         [
             f"Reference PN-{str(booking.id)[:8].upper()}",
             f"{booking.service.name}: {booking.booking_date} at {booking.start_time}–{booking.end_time}",
-            f"Deposit paid: {cad(booking.deposit_cents)}",
+            f"Deposit paid: {cad(booking.deposit_cents, booking.currency)}",
             "Cancel within 30 minutes of booking for a full deposit refund. Later cancellations are subject to the refund policy.",
         ],
     )
@@ -130,7 +137,7 @@ def order_status_update_email(order, status):
         [
             f"Reference PN-{str(order.id)[:8].upper()}",
             f"Your order status is now {status}.",
-            f"Order total: {cad(order.total_cents)}",
+            f"Order total: {cad(order.total_cents, order.currency)}",
         ],
     )
 
@@ -145,7 +152,7 @@ def queue_order_paid(db, order):
             "New paid order",
             [
                 f"PN-{str(order.id)[:8].upper()}",
-                f"{order.customer_name}: {cad(order.total_cents)}",
+                f"{order.customer_name}: {cad(order.total_cents, order.currency)}",
             ],
         ),
     )

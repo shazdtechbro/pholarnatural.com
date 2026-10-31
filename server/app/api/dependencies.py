@@ -36,6 +36,12 @@ def get_payment_gateway() -> PaymentGateway:
     Dependency that returns the configured payment gateway.
     During testing, we can easily override this to return a MockPaymentGateway.
     """
+    if settings.PAYMENT_PROVIDER == "bachs":
+        from app.services.bachs_gateway import BachsGateway, BachsError
+        try:
+            return BachsGateway()
+        except BachsError:
+            raise HTTPException(503, "Sandbox payment credentials are not configured yet.")
     return StripeGateway()
 
 

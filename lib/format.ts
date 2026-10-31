@@ -2,7 +2,7 @@ import { CURRENCY, DEPOSIT_RATE } from './config'
 import type { Cents } from './types'
 
 /**
- * Money formatting. All prices are CAD (doc §7) and the currency is always shown explicitly,
+ * Money formatting. Each purchase retains its currency, which is always shown explicitly,
  * because the store sells internationally and "$25.00" alone is ambiguous.
  *
  * A fixed 'en-CA' locale is passed on purpose: `Intl` with an undefined locale resolves
@@ -15,8 +15,9 @@ const formatter = new Intl.NumberFormat('en-CA', {
 })
 
 /** `2500` → `"CAD $25.00"` */
-export function formatPrice(cents: Cents): string {
-  return `${CURRENCY} ${formatter.format(cents / 100).replace(/^CA\$/, '$')}`
+export function formatPrice(cents: Cents, currency: string = CURRENCY): string {
+  const selected = currency === CURRENCY ? formatter : new Intl.NumberFormat('en-CA', { style: 'currency', currency, minimumFractionDigits: 2 })
+  return `${currency} ${selected.format(cents / 100).replace(/^(CA|US)\$/, '$')}`
 }
 
 /** `2500` → `"$25.00"` — for dense tables where the CAD is stated once in a header. */

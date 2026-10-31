@@ -126,7 +126,7 @@ export default function AdminDashboardPage() {
                       <span className="block text-[12px]">{formatDateShort(o.created_at.slice(0, 10))}</span>
                     </Td>
                     <Td>{o.customer_name}</Td>
-                    <Td className="font-semibold text-on-surface">{formatPrice(o.total_cents)}</Td>
+                    <Td className="font-semibold text-on-surface">{formatPrice(o.total_cents, o.currency)}</Td>
                     <Td>
                       <StatusBadge status={o.status} />
                     </Td>

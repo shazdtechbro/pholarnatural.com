@@ -48,6 +48,7 @@ class OrderResponse(BaseModel):
     discount_cents: int
     tax_cents: int = 0
     total_cents: int
+    currency: str = "CAD"
     status: str
 
     model_config = {"from_attributes": True}
@@ -66,6 +67,7 @@ class OrderCreateResponse(BaseModel):
     shipping_cents: int
     discount_cents: int
     total_cents: int
+    currency: str = "CAD"
     status: str
 
     model_config = {"from_attributes": True}
@@ -78,6 +80,7 @@ class OrderCheckoutResponse(BaseModel):
     checkout_url: str
     confirmation_token: str
     total_cents: int
+    currency: str = "CAD"
     status: str
 
 
@@ -116,6 +119,7 @@ class AdminOrderResponse(BaseModel):
     discount_cents: int
     tax_cents: int = 0
     total_cents: int
+    currency: str = "CAD"
     status: str
     created_at: datetime
     items: List[OrderItemResponse]
@@ -138,6 +142,7 @@ class AdminOrderResponse(BaseModel):
             "discount_cents": data.discount_cents,
             "tax_cents": data.tax_cents,
             "total_cents": data.total_cents,
+            "currency": data.currency,
             "status": data.status,
             "created_at": data.created_at,
             "items": [

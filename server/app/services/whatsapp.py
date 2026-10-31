@@ -189,6 +189,8 @@ def send_whatsapp_notification(number: str, message: str) -> None:
 
 
 def notify(event: NotificationEvent, message: str, db: Session) -> None:
+    if settings.PAYMENT_SANDBOX_INSTANCE:
+        return
     """
     Fire-and-forget WhatsApp notification — the sole entry point for alerts.
 

@@ -10,6 +10,15 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Pholar Naturals API"
     DATABASE_URL: str
 
+    PAYMENT_PROVIDER: Literal["stripe", "bachs"] = "stripe"
+    BACHS_ENVIRONMENT: Literal["sandbox", "live"] = "sandbox"
+    BACHS_API_KEY: str = ""
+    BACHS_WEBHOOK_SECRET: str = ""
+    PAYMENT_SANDBOX_INSTANCE: bool = False
+    USD_CATALOG_APPROVED: bool = False
+    PAYMENT_NOTIFICATIONS_ENABLED: bool = True
+    PRICING_CURRENCY: Literal["CAD", "USD"] = "CAD"
+
     # Stripe Settings
     STRIPE_SECRET_KEY: str
     STRIPE_PUBLISHABLE_KEY: str
@@ -88,6 +97,16 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "CORS_ORIGINS must contain exact HTTPS origins (or loopback development origins)."
                 )
+        if self.PAYMENT_PROVIDER == "bachs":
+            prefix = "sk_sandbox_" if self.BACHS_ENVIRONMENT == "sandbox" else "sk_live_"
+            if self.BACHS_API_KEY and not self.BACHS_API_KEY.startswith(prefix):
+                raise ValueError("Bachs key does not match its configured environment.")
+            if self.PRICING_CURRENCY != "USD":
+                raise ValueError("Bachs checkout requires an explicitly approved USD catalog.")
+            if self.BACHS_ENVIRONMENT == "live" and (self.PAYMENT_SANDBOX_INSTANCE or not self.USD_CATALOG_APPROVED):
+                raise ValueError("Live Bachs requires approved USD prices and a live deployment.")
+            if self.BACHS_ENVIRONMENT == "sandbox" and not self.PAYMENT_SANDBOX_INSTANCE:
+                raise ValueError("Bachs sandbox must use a separate application database and deployment.")
         ZoneInfo(self.BUSINESS_TIMEZONE)
         return self
 

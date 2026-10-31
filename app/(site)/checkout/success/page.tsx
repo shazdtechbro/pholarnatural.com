@@ -89,7 +89,7 @@ function OrderConfirmation() {
             <span>
               {i.product_name} · {i.variant_label} × {i.quantity}
             </span>
-            <strong>{formatPrice(i.quantity * i.unit_price_cents)}</strong>
+            <strong>{formatPrice(i.quantity * i.unit_price_cents, order.currency)}</strong>
           </li>
         ))}
       </ul>
@@ -103,7 +103,7 @@ function OrderConfirmation() {
         ].map(([label, amount]) => (
           <div className="flex justify-between" key={label}>
             <dt>{label}</dt>
-            <dd>{formatPrice(Number(amount))}</dd>
+            <dd>{formatPrice(Number(amount), order.currency)}</dd>
           </div>
         ))}
       </dl>

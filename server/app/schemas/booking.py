@@ -24,6 +24,7 @@ class BookingResponse(BaseModel):
     start_time: time
     end_time: time
     status: str
+    currency: str = "CAD"
     deposit_cents: int
 
     model_config = {"from_attributes": True}
@@ -37,6 +38,7 @@ class BookingCreateResponse(BaseModel):
     start_time: time
     end_time: time
     status: str
+    currency: str = "CAD"
     deposit_cents: int
 
     model_config = {"from_attributes": True}
@@ -84,10 +86,12 @@ class BookingDepositResponse(BaseModel):
     """Phase 9: Payment Intent created — mount Payment Element using client_secret."""
 
     booking_id: UUID
-    client_secret: str
+    client_secret: str | None = None
+    checkout_url: str | None = None
+    currency: str = "CAD"
     confirmation_token: str
     reference: str
-    publishable_key: str
+    publishable_key: str = ""
     amount_cents: int
     booking_date: date
     start_time: time
@@ -116,6 +120,7 @@ class AdminBookingResponse(BaseModel):
     start_time: time
     end_time: time
     status: str
+    currency: str = "CAD"
     deposit_cents: int
     cancellation_reason: Optional[str] = Field(default=None, max_length=255)
     reference: str
@@ -140,6 +145,7 @@ class AdminBookingResponse(BaseModel):
             "end_time": data.end_time,
             "status": data.status,
             "deposit_cents": data.deposit_cents,
+            "currency": data.currency,
             "cancellation_reason": getattr(data, "cancellation_reason", None),
             "reference": f"PN-{str(data.id)[:8].upper()}",
         }

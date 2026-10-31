@@ -36,7 +36,9 @@ export interface BookingDepositResponse {
   booking_id: string
   confirmation_token: string
   reference: string
-  client_secret: string
+  checkout_url?: string | null
+  currency?: string
+  client_secret: string | null
   publishable_key: string
   amount_cents: number // deposit amount
   booking_date: string
@@ -71,8 +73,9 @@ export async function getAvailableSlots(date: string, serviceId?: string): Promi
   }))
 }
 
-export async function createBooking(payload: BookingPayload): Promise<BookingDepositResponse> {
+export async function createBooking(payload: BookingPayload, requestId?: string): Promise<BookingDepositResponse> {
   return apiClient<BookingDepositResponse>('/api/v1/bookings/', {
+    headers: requestId ? { 'Idempotency-Key': requestId } : undefined,
     method: 'POST',
     body: {
       ...payload,

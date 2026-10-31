@@ -1,3 +1,4 @@
+import { CURRENCY } from '@/lib/config'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Mail, ShieldCheck } from 'lucide-react'
@@ -143,7 +144,7 @@ export default async function Footer() {
       <div className="border-t border-outline-variant/40">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-6 md:flex-row md:items-center md:justify-between md:px-16">
           <p className="font-body-md text-[12px] text-on-surface-variant">
-            © {year} {BUSINESS.name}. All rights reserved. All prices in CAD.
+            © {year} {BUSINESS.name}. All rights reserved. All prices in {CURRENCY}.
           </p>
 
           <ul className="flex flex-wrap gap-x-5 gap-y-2">
@@ -166,7 +167,7 @@ export default async function Footer() {
 
           <p className="flex items-center gap-2 font-body-md text-[12px] text-on-surface-variant">
             <ShieldCheck className="h-4 w-4 text-primary" aria-hidden="true" />
-            Payments secured by Stripe
+            Secure payments
           </p>
         </div>
       </div>

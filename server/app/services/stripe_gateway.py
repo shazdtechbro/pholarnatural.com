@@ -59,6 +59,10 @@ class StripeGateway(PaymentGateway):
         )
         return {"payment_intent_id": pi.id, "client_secret": pi.client_secret}
 
+    def retrieve_payment_intent(self, payment_intent_id):
+        intent = stripe.PaymentIntent.retrieve(payment_intent_id)
+        return {"client_secret": intent.client_secret}
+
     def create_refund(
         self,
         payment_intent_id: str,

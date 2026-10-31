@@ -15,11 +15,18 @@ from app.core.transactions import transaction_lock
 router = APIRouter()
 
 
+def legacy_gateway(gateway=Depends(get_payment_gateway)):
+    if getattr(gateway, "provider", "stripe") != "stripe":
+        from app.services.stripe_gateway import StripeGateway
+        return StripeGateway()
+    return gateway
+
+
 @router.post("/", include_in_schema=False)
 async def stripe_webhook(
     request: Request,
     db: Session = Depends(get_db),
-    payment_gateway=Depends(get_payment_gateway),
+    payment_gateway=Depends(legacy_gateway),
 ):
     payload = await request.body()
     if len(payload) > 1_000_000:
@@ -199,7 +206,7 @@ def complete_refund(db, payment_intent_id, amount, refund_id):
     if full and record.status == "refunded":
         return
     if full and order:
-        if order.status in (*order_service.PAID_STATUSES, "refund_pending"):
+        if order.payment_fulfilled:
             for item in order.items:
                 variant = (
                     db.query(ProductVariant)
@@ -209,6 +216,7 @@ def complete_refund(db, payment_intent_id, amount, refund_id):
                 )
                 if variant:
                     variant.stock_count += item.quantity
+            order.payment_fulfilled = False
         order.status = "refunded"
         queue_order_status(db, order)
     else:

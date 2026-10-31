@@ -56,7 +56,7 @@ export interface DashboardOrder {
   id: string
   order_number: string
   customer_name: string
-  total_cents: number
+  currency?: string; total_cents: number
   status: string
   created_at: string
 }

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.models.booking import Booking
 from app.models.order import Order
+from app.core.config import settings
 
 
 def get_dashboard_stats(db: Session) -> dict:
@@ -22,6 +23,7 @@ def get_dashboard_stats(db: Session) -> dict:
         db.query(func.sum(Order.total_cents))
         .filter(
             func.date(Order.created_at) == today,
+            Order.currency == settings.PRICING_CURRENCY,
             Order.status.in_(
                 ["paid", "confirmed", "processing", "shipped", "delivered"]
             ),
@@ -33,6 +35,7 @@ def get_dashboard_stats(db: Session) -> dict:
     revenue_total_cents: int = (
         db.query(func.sum(Order.total_cents))
         .filter(
+            Order.currency == settings.PRICING_CURRENCY,
             Order.status.in_(
                 ["paid", "confirmed", "processing", "shipped", "delivered"]
             )
@@ -55,6 +58,7 @@ def get_dashboard_stats(db: Session) -> dict:
             "order_number": f"PN-{str(o.id)[:8].upper()}",
             "customer_name": o.customer_name,
             "total_cents": o.total_cents,
+            "currency": o.currency,
             "status": o.status,
             "created_at": o.created_at.isoformat() if o.created_at else "",
         }

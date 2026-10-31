@@ -92,7 +92,7 @@ app.add_middleware(
     allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Confirmation-Token"],
+    allow_headers=["Authorization", "Content-Type", "X-Confirmation-Token", "Idempotency-Key"],
 )
 
 # Include our routers
@@ -149,3 +149,9 @@ app.include_router(newsletter.router, prefix="/api/v1/newsletter", tags=["Newsle
 
 from app.api.routes import customer
 app.include_router(customer.router, prefix="/api/v1/account", tags=["Customer Accounts"])
+
+from app.api.routes import bachs_webhook
+app.include_router(bachs_webhook.router, prefix="/api/v1/webhooks/bachs", tags=["Bachs Webhooks"])
+
+from app.api.routes import payment_info
+app.include_router(payment_info.router, prefix="/api/v1/payments", tags=["Payment configuration"])

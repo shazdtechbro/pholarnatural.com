@@ -40,6 +40,7 @@ class DashboardOrder(BaseModel):
     id: str
     order_number: str
     customer_name: str
+    currency: str = "CAD"
     total_cents: int
     status: str
     created_at: str

@@ -93,7 +93,7 @@ function Confirmation() {
             <div>
               <dt>Deposit</dt>
               <dd>
-                {formatPrice(booking.deposit_cents)} ·{' '}
+                {formatPrice(booking.deposit_cents, booking.currency)} ·{' '}
                 {booking.status === 'confirmed' ? 'paid' : booking.status.replace('_', ' ')}
               </dd>
             </div>

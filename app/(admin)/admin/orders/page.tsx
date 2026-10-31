@@ -138,7 +138,7 @@ export default function AdminOrdersPage() {
                   <span className="block text-[12px]">{o.customer_email}</span>
                 </Td>
                 <Td>{o.items.reduce((s, i) => s + i.quantity, 0)}</Td>
-                <Td className="font-semibold text-on-surface">{formatPrice(o.total_cents)}</Td>
+                <Td className="font-semibold text-on-surface">{formatPrice(o.total_cents, o.currency)}</Td>
                 <Td>{formatDateShort(o.created_at.slice(0, 10))}</Td>
                 <Td>
                   <select
@@ -226,7 +226,7 @@ function OrderModal({
                   </p>
                 </div>
                 <p className="shrink-0 font-body-md text-body-md font-bold text-primary">
-                  {formatPrice(item.unit_price_cents * item.quantity)}
+                  {formatPrice(item.unit_price_cents * item.quantity, order.currency)}
                 </p>
               </li>
             ))}
@@ -256,27 +256,27 @@ function OrderModal({
             <dl className="space-y-2 font-body-md text-body-md">
               <div className="flex justify-between">
                 <dt className="text-on-surface-variant">Subtotal</dt>
-                <dd className="text-on-surface">{formatPrice(order.subtotal_cents)}</dd>
+                <dd className="text-on-surface">{formatPrice(order.subtotal_cents, order.currency)}</dd>
               </div>
               {order.discount_cents > 0 && (
                 <div className="flex justify-between text-primary">
                   <dt>Discount</dt>
-                  <dd>−{formatPrice(order.discount_cents)}</dd>
+                  <dd>−{formatPrice(order.discount_cents, order.currency)}</dd>
                 </div>
               )}
               <div className="flex justify-between">
                 <dt className="text-on-surface-variant">Shipping</dt>
                 <dd className="text-on-surface">
-                  {order.shipping_cents === 0 ? 'Free' : formatPrice(order.shipping_cents)}
+                  {order.shipping_cents === 0 ? 'Free' : formatPrice(order.shipping_cents, order.currency)}
                 </dd>
               </div>
               <div className="flex justify-between">
                 <dt>Tax</dt>
-                <dd>{formatPrice(order.tax_cents ?? 0)}</dd>
+                <dd>{formatPrice(order.tax_cents ?? 0, order.currency)}</dd>
               </div>
               <div className="flex justify-between border-t border-outline-variant pt-2 font-semibold">
                 <dt className="text-primary">Total</dt>
-                <dd className="text-primary">{formatPrice(order.total_cents)}</dd>
+                <dd className="text-primary">{formatPrice(order.total_cents, order.currency)}</dd>
               </div>
             </dl>
           </div>

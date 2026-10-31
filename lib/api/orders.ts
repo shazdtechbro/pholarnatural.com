@@ -22,15 +22,17 @@ export interface OrderCheckoutResponse {
   order_id: string
   checkout_url: string
   confirmation_token: string
+  currency?: string
   total_cents: number
   status: string
 }
 
 // ─── Public functions ─────────────────────────────────────────────────────────
 
-export async function createOrder(payload: OrderPayload): Promise<OrderCheckoutResponse> {
+export async function createOrder(payload: OrderPayload, requestId?: string): Promise<OrderCheckoutResponse> {
   return apiClient<OrderCheckoutResponse>('/api/v1/orders/', {
     method: 'POST',
+    headers: requestId ? { 'Idempotency-Key': requestId } : undefined,
     body: payload,
   })
 }
@@ -41,6 +43,7 @@ export interface ConfirmedOrder {
   customer_name: string
   customer_email: string
   status: string
+  currency?: string
   total_cents: number
   subtotal_cents: number
   tax_cents: number

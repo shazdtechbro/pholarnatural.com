@@ -1,0 +1,44 @@
+name: pholar-sandbox
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pholar_sandbox
+      POSTGRES_USER: pholar_sandbox
+      POSTGRES_PASSWORD: ${SANDBOX_DB_PASSWORD}
+    volumes:
+      - sandbox_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U pholar_sandbox -d pholar_sandbox"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+  api:
+    build: .
+    image: pholar-bachs-sandbox
+    restart: unless-stopped
+    env_file: .env.sandbox
+    ports:
+      - "127.0.0.1:8001:8000"
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    depends_on:
+      db:
+        condition: service_healthy
+  payment-worker:
+    image: pholar-bachs-sandbox
+    restart: unless-stopped
+    env_file: .env.sandbox
+    command: [python, -m, app.services.bachs_events]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    depends_on:
+      db:
+        condition: service_healthy
+volumes:
+  sandbox_data:

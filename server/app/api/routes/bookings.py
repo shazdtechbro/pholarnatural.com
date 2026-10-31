@@ -50,6 +50,7 @@ def get_slots(
 @router.post("/", response_model=BookingDepositResponse, status_code=201)
 def create_booking(
     booking_in: BookingCreate,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
     payment_gateway: PaymentGateway = Depends(get_payment_gateway),
 ):
@@ -61,23 +62,26 @@ def create_booking(
     from fastapi import HTTPException
 
     key = settings.STRIPE_PUBLISHABLE_KEY
-    if not key.startswith(("pk_test_", "pk_live_")):
+    if settings.PAYMENT_PROVIDER == "stripe" and not key.startswith(("pk_test_", "pk_live_")):
         raise HTTPException(
             503, "Deposit payment is not configured yet. Please contact the studio."
         )
     secret = settings.STRIPE_SECRET_KEY
-    if (secret.startswith("sk_test_") and not key.startswith("pk_test_")) or (
+    if settings.PAYMENT_PROVIDER == "stripe" and ((secret.startswith("sk_test_") and not key.startswith("pk_test_")) or (
         secret.startswith("sk_live_") and not key.startswith("pk_live_")
-    ):
+    )):
         raise HTTPException(503, "Deposit payment configuration needs attention.")
     db_booking, client_secret = booking_service.create_booking_with_payment_intent(
         db=db,
         booking_in=booking_in,
         payment_gateway=payment_gateway,
+        request_key=idempotency_key,
     )
     return BookingDepositResponse(
         booking_id=db_booking.id,
-        client_secret=client_secret,
+        client_secret=client_secret if db_booking.payment_provider == "stripe" else None,
+        checkout_url=client_secret if db_booking.payment_provider == "bachs" else None,
+        currency=db_booking.currency,
         confirmation_token=__import__(
             "app.core.security", fromlist=["customer_token"]
         ).customer_token("booking", db_booking.id),
@@ -151,6 +155,7 @@ def booking_confirmation(
         "end_time": booking.end_time,
         "status": booking.status,
         "deposit_cents": booking.deposit_cents,
+        "currency": booking.currency,
         "cancellation_reason": booking.cancellation_reason,
         "created_at": booking.created_at,
     }

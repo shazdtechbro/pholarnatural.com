@@ -3,7 +3,7 @@ import type { CartItem } from '@/lib/types'
 export interface Customer { id: string; name: string; email: string; verified: boolean }
 export interface SavedCart { items: CartItem[]; version: number }
 export interface AccountHistory {
-  orders: { id: string; reference: string; date: string; status: string; total_cents: number; url: string }[]
+  orders: { id: string; reference: string; date: string; status: string; currency?: string; total_cents: number; url: string }[]
   bookings: { id: string; service: string; date: string; time: string; status: string; deposit_cents: number; url: string }[]
 }
 export class AccountError extends Error {
