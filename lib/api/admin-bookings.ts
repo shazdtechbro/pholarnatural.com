@@ -1,6 +1,8 @@
 import { apiClient } from './client'
 
 export interface AdminBooking {
+  payment_environment?: string
+  payment_provider?: string
   id: string
   service_id: string
   service_name: string

@@ -7,23 +7,25 @@ import { useState, useEffect } from 'react'
 import { UserPlus, AlertCircle, CheckCircle2, ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react'
 import { Field } from '@/components/FormField'
 import { adminRegister } from '@/lib/api/admin'
+import { useHydrated } from '@/lib/use-hydrated'
 
 /** Admin account registration (requires the developer-issued secret key). */
 export default function AdminRegisterPage() {
+  const hydrated = useHydrated()
+  return hydrated ? <AdminRegisterForm /> : <p className="p-8">Loading registration…</p>
+}
+
+function AdminRegisterForm() {
   const router = useRouter()
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('email') ?? '')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [secretKey, setSecretKey] = useState('')
+  const [secretKey, setSecretKey] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('invite') ?? '')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.hash.slice(1))
-    const invite = params.get('invite'), address = params.get('email')
-    if (invite && address) { setSecretKey(invite); setEmail(address); window.history.replaceState(null, '', window.location.pathname) }
-  }, [])
+  useEffect(() => { window.history.replaceState(null, '', window.location.pathname) }, [])
 
 
   async function submit(e: React.FormEvent) {

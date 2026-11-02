@@ -132,7 +132,7 @@ export default function AdminOrdersPage() {
           <tbody>
             {visible.map((o) => (
               <tr key={o.id}>
-                <Td className="font-semibold text-primary">{o.order_number}</Td>
+                <Td className="font-semibold text-primary">{o.order_number}{o.payment_environment === 'sandbox' && <span className="ml-2 rounded bg-secondary/10 px-2 py-1 text-xs">TEST</span>}</Td>
                 <Td>
                   <span className="block font-semibold text-on-surface">{o.customer_name}</span>
                   <span className="block text-[12px]">{o.customer_email}</span>

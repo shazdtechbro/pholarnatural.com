@@ -19,6 +19,8 @@ export interface AdminOrderShippingAddress {
 }
 
 export interface AdminOrder {
+  payment_environment?: string
+  payment_provider?: string
   id: string
   order_number: string
   customer_name: string

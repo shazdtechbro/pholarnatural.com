@@ -2,11 +2,17 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api/client'
+import { useHydrated } from '@/lib/use-hydrated'
 
 export default function AdminRecovery({reset=false}:{reset?:boolean}) {
-  const [email,setEmail]=useState(''), [password,setPassword]=useState(''), [token,setToken]=useState('')
+  const hydrated = useHydrated()
+  return hydrated ? <RecoveryForm reset={reset} /> : <p className="p-8">Loading password recovery…</p>
+}
+
+function RecoveryForm({reset}:{reset:boolean}) {
+  const [email,setEmail]=useState(''), [password,setPassword]=useState(''), [token]=useState(() => new URLSearchParams(window.location.hash.slice(1)).get('token') ?? '')
   const [busy,setBusy]=useState(false), [message,setMessage]=useState('')
-  useEffect(()=>{const value=new URLSearchParams(window.location.hash.slice(1)).get('token');if(value){setToken(value);window.history.replaceState(null,'',window.location.pathname)}},[])
+  useEffect(()=>{window.history.replaceState(null,'',window.location.pathname)},[])
   async function submit(event:React.FormEvent){
     event.preventDefault();setBusy(true);setMessage('')
     try{await apiClient('/api/v1/admin/'+(reset?'reset-password':'forgot-password'),{method:'POST',body:reset?{token,password}:{email}});setMessage(reset?'Your password changed. Sign in with your new password.':'If this is an active admin account, a reset email will arrive shortly. Check spam too.');setPassword('')}

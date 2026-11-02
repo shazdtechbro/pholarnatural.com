@@ -109,6 +109,8 @@ class OrderItemResponse(BaseModel):
 
 
 class AdminOrderResponse(BaseModel):
+    payment_environment: str = "legacy"
+    payment_provider: str = "stripe"
     id: UUID
     order_number: str
     customer_name: Name
@@ -143,6 +145,8 @@ class AdminOrderResponse(BaseModel):
             "tax_cents": data.tax_cents,
             "total_cents": data.total_cents,
             "currency": data.currency,
+            "payment_environment": data.payment_environment,
+            "payment_provider": data.payment_provider,
             "status": data.status,
             "created_at": data.created_at,
             "items": [

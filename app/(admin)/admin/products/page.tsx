@@ -16,7 +16,6 @@ import {
 } from '@/components/admin/ui'
 import { Field, TextareaField } from '@/components/FormField'
 import { useToast } from '@/context/ToastContext'
-import { formatPrice } from '@/lib/format'
 import {
   listAdminProducts,
   createAdminProduct,

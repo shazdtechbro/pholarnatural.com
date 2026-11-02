@@ -110,6 +110,8 @@ class BookingCancelResponse(BaseModel):
 
 
 class AdminBookingResponse(BaseModel):
+    payment_environment: str = "legacy"
+    payment_provider: str = "stripe"
     id: UUID
     service_id: UUID
     service_name: str
@@ -146,6 +148,8 @@ class AdminBookingResponse(BaseModel):
             "status": data.status,
             "deposit_cents": data.deposit_cents,
             "currency": data.currency,
+            "payment_environment": data.payment_environment,
+            "payment_provider": data.payment_provider,
             "cancellation_reason": getattr(data, "cancellation_reason", None),
             "reference": f"PN-{str(data.id)[:8].upper()}",
         }
