@@ -108,7 +108,7 @@ export async function apiClient<T>(path: string, options: ApiClientOptions = {})
     })
   } catch (error) {
     unstable_rethrow(error)
-    throw new ApiError(0, 'The connection was interrupted. Your request may have reached the server. Check the result, then retry the same checkout if needed.')
+    throw new ApiError(0, 'The connection was interrupted. Your request may have reached the server. Check whether your action completed before trying again.')
   }
 
   if (!response.ok) {
