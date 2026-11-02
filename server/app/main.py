@@ -64,7 +64,7 @@ async def unexpected_error(request: Request, exc: Exception):
         type(exc).__name__,
     )
     return JSONResponse(
-        {"detail": "An unexpected error occurred. Please retry or contact support."},
+        {"detail": "An unexpected error occurred. Please retry or contact support.", "request_id": getattr(request.state, "request_id", None)},
         status_code=500,
     )
 
@@ -155,3 +155,15 @@ app.include_router(bachs_webhook.router, prefix="/api/v1/webhooks/bachs", tags=[
 
 from app.api.routes import payment_info
 app.include_router(payment_info.router, prefix="/api/v1/payments", tags=["Payment configuration"])
+
+
+@app.get("/ready", include_in_schema=False)
+def readiness():
+    from app.db.database import SessionLocal
+    from sqlalchemy import text
+    try:
+        with SessionLocal() as db:
+            db.execute(text("SELECT 1"))
+        return {"status": "ready"}
+    except Exception:
+        return JSONResponse({"status": "unavailable"}, status_code=503)

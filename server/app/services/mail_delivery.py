@@ -80,7 +80,8 @@ def process_one(db, sender=None):
         job.attempts += 1
         job.first_attempt_at = first or now
     if not polling and not job.payload:
-        recipients = [job.recipient] if job.recipient != "__admin__" else [r.strip() for r in (settings.ADMIN_EMAIL or "").split(",") if r.strip()]
+        from app.services.email import admin_recipients
+        recipients = [job.recipient] if job.recipient != "__admin__" else admin_recipients(db)
         if not recipients:
             job.status = "queued"
             job.last_error = "ADMIN_EMAIL is not configured"

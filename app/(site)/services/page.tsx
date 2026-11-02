@@ -12,7 +12,7 @@ import { SITE_URL, CURRENCY, BUSINESS, DEPOSIT_RATE } from '@/lib/config'
 export const metadata: Metadata = {
   title: 'Services',
   description:
-    'French Braids, Cornrows, Cornrow Mix Twist, Natural Twist, Wash and Blow Dry, Hair Treatment and Hair Waxing — professional beauty treatments rooted in African tradition. Book online with a 10% deposit. All prices in CAD.',
+    'French Braids, Cornrows, Cornrow Mix Twist, Natural Twist, Wash and Blow Dry, Hair Treatment and Hair Waxing — professional beauty treatments rooted in African tradition. Book online with a 10% deposit. All prices in USD.',
   alternates: { canonical: '/services' },
   openGraph: {
     title: 'Services | Pholar Natural',

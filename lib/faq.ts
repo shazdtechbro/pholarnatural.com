@@ -114,7 +114,7 @@ export const FAQS: FaqEntry[] = [
     category: 'Payments',
     question: 'What currency are your prices in?',
     answer:
-      'Every price on this site is in Canadian dollars (CAD). If you are paying with a card issued outside Canada, your bank sets the conversion rate.',
+      'Catalogue prices are in US dollars (USD). Choose USD at Bachs checkout for international cards, or a supported local currency to see its payment methods and conversion quote. Your bank may apply its own fees.',
   },
   {
     id: 'faq-payment-methods',

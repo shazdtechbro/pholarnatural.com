@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     BACHS_API_KEY: str = ""
     BACHS_WEBHOOK_SECRET: str = ""
     PAYMENT_SANDBOX_INSTANCE: bool = False
+    ALLOW_SANDBOX_CHECKOUT: bool = False
     USD_CATALOG_APPROVED: bool = False
     PAYMENT_NOTIFICATIONS_ENABLED: bool = True
     PRICING_CURRENCY: Literal["CAD", "USD"] = "CAD"
@@ -105,7 +106,7 @@ class Settings(BaseSettings):
                 raise ValueError("Bachs checkout requires an explicitly approved USD catalog.")
             if self.BACHS_ENVIRONMENT == "live" and (self.PAYMENT_SANDBOX_INSTANCE or not self.USD_CATALOG_APPROVED):
                 raise ValueError("Live Bachs requires approved USD prices and a live deployment.")
-            if self.BACHS_ENVIRONMENT == "sandbox" and not self.PAYMENT_SANDBOX_INSTANCE:
+            if self.BACHS_ENVIRONMENT == "sandbox" and not (self.PAYMENT_SANDBOX_INSTANCE or self.ALLOW_SANDBOX_CHECKOUT):
                 raise ValueError("Bachs sandbox must use a separate application database and deployment.")
         ZoneInfo(self.BUSINESS_TIMEZONE)
         return self

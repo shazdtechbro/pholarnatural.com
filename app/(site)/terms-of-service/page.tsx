@@ -30,7 +30,7 @@ export default function TermsOfServicePage() {
 
       <h2>Product purchases</h2>
       <ul>
-        <li>All prices are in Canadian dollars (CAD) and include no taxes unless stated.</li>
+        <li>All prices are in US dollars (USD) and include no taxes unless stated.</li>
         <li>
           Placing an order is an offer to buy. A contract forms when we send your order confirmation
           email.

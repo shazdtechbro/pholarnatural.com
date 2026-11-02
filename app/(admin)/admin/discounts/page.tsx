@@ -308,18 +308,19 @@ function DiscountForm({
         </div>
 
         <Field
-          label={values.discount_type === 'percentage' ? 'Percentage' : 'Amount (cents)'}
+          label={values.discount_type === 'percentage' ? 'Percentage' : 'Amount in USD'}
           type="number"
           required
           min={1}
           max={values.discount_type === 'percentage' ? 100 : undefined}
-          value={values.value}
+          step={values.discount_type === 'percentage' ? 1 : 0.01}
+          value={values.discount_type === 'percentage' ? values.value : values.value / 100}
           hint={
             values.discount_type === 'percentage'
               ? `${values.value}% off the order`
               : `${formatPrice(values.value)} off the order`
           }
-          onChange={(e) => setValues((v) => ({ ...v, value: Number(e.target.value) }))}
+          onChange={(e) => setValues((v) => ({ ...v, value: values.discount_type === 'percentage' ? Number(e.target.value) : Math.round(Number(e.target.value) * 100) }))}
         />
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -332,16 +333,17 @@ function DiscountForm({
             onChange={(e) => setValues((v) => ({ ...v, max_uses: e.target.value }))}
           />
           <Field
-            label="Min order (cents)"
+            label="Minimum order in USD"
             type="number"
             min={0}
-            value={values.min_order_cents}
+            step="0.01"
+            value={values.min_order_cents ? Number(values.min_order_cents) / 100 : ''}
             hint={
               values.min_order_cents
                 ? formatPrice(Number(values.min_order_cents))
                 : 'Leave blank for no minimum'
             }
-            onChange={(e) => setValues((v) => ({ ...v, min_order_cents: e.target.value }))}
+            onChange={(e) => setValues((v) => ({ ...v, min_order_cents: e.target.value ? String(Math.round(Number(e.target.value) * 100)) : '' }))}
           />
         </div>
 

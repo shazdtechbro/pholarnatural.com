@@ -348,13 +348,14 @@ function ServiceForm({
             onChange={(e) => setValues((v) => ({ ...v, duration_minutes: Number(e.target.value) }))}
           />
           <Field
-            label="Price (cents)"
+            label="Price in USD"
             type="number"
             required
             min={0}
-            value={values.price_cents}
-            hint={formatPrice(values.price_cents)}
-            onChange={(e) => setValues((v) => ({ ...v, price_cents: Number(e.target.value) }))}
+            step="0.01"
+            value={values.price_cents / 100}
+            hint="Enter dollars, e.g. 80 for USD $80.00. The booking deposit is calculated automatically."
+            onChange={(e) => setValues((v) => ({ ...v, price_cents: Math.round(Number(e.target.value) * 100) }))}
           />
         </div>
 

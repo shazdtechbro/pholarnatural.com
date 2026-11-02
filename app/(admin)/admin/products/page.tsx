@@ -505,11 +505,13 @@ function ProductForm({
                   }
                 />
                 <Field
-                  label="Price (cents)"
+                  label="Price in USD"
                   type="number"
-                  value={v.price_cents}
-                  hint={formatPrice(v.price_cents)}
-                  onChange={(e) => patchVariant(v.id, { price_cents: Number(e.target.value) })}
+                  min={0}
+                  step="0.01"
+                  value={v.price_cents / 100}
+                  hint="Enter dollars, e.g. 25 for USD $25.00."
+                  onChange={(e) => patchVariant(v.id, { price_cents: Math.round(Number(e.target.value) * 100) })}
                 />
                 <Field
                   label="Stock"

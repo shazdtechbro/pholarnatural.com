@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import AdminTeam from '@/components/admin/AdminTeam'
 import EmailStatus from '@/components/admin/EmailStatus'
 import PasswordChange from '@/components/admin/PasswordChange'
 import {
@@ -410,6 +411,7 @@ export default function AdminSettingsPage() {
       <div className="max-w-2xl space-y-6">
         {/* WhatsApp connection — link/unlink, QR code, status */}
         <WhatsAppConnectionPanel />
+        <AdminTeam />
 
         <form onSubmit={save} className="space-y-6">
           {/* WhatsApp notification toggles */}
@@ -427,7 +429,7 @@ export default function AdminSettingsPage() {
               label="Notifier WhatsApp number"
               type="tel"
               value={settings.notifier_whatsapp_number}
-              hint="Include country code, e.g. +1 416 555 0142. Alerts go here."
+              hint="Use country code and digits only, e.g. +14165550142. This is the receiving number; link a different sending number above."
               placeholder="+1 416 555 0142"
               onChange={(e) => set('notifier_whatsapp_number', e.target.value)}
             />
@@ -500,14 +502,7 @@ export default function AdminSettingsPage() {
               <Mail className="h-5 w-5" aria-hidden="true" />
               Email notifications
             </h2>
-            <label className="my-4 flex items-center gap-3">
-              <input
-                type="checkbox"
-                checked={settings.email_notifications_enabled}
-                onChange={(e) => set('email_notifications_enabled', e.target.checked)}
-              />
-              Send order and appointment alerts to admin email recipients
-            </label>
+            <p className="my-4 text-sm leading-6">Operational order and appointment alerts are sent automatically to every active admin account. Manage recipients in Your admin team above.</p>
             <p>
               Customers always receive transactional payment, order and appointment emails. Turning
               off admin alerts does not turn off customer receipts.
@@ -522,45 +517,49 @@ export default function AdminSettingsPage() {
               Shipping & tax
             </h2>
             <p className="mb-5 font-body-md text-body-md text-on-surface-variant">
-              Rates are applied at checkout based on destination country. All amounts in CAD cents
-              (e.g. 995 = CAD $9.95).
+              Rates are applied at checkout based on destination country. Enter USD dollars, for example 9.95 for $9.95.
             </p>
             <Field
-              label="Free shipping above (CAD cents)"
+              label="Free shipping above (USD)"
               type="number"
               min={0}
-              value={settings.free_shipping_threshold_cents}
-              onChange={(e) => set('free_shipping_threshold_cents', Number(e.target.value))}
+              step="0.01"
+                value={settings.free_shipping_threshold_cents / 100}
+              onChange={(e) => set('free_shipping_threshold_cents', Math.round(Number(e.target.value) * 100))}
             />
             <div className="grid gap-4 sm:grid-cols-2">
               <Field
-                label="Canada rate (cents)"
+                label="Canada rate (USD)"
                 type="number"
                 min={0}
-                value={settings.shipping_rate_domestic_cents}
-                hint="e.g. 995 = CAD $9.95"
-                onChange={(e) => set('shipping_rate_domestic_cents', Number(e.target.value))}
+                step="0.01"
+                value={settings.shipping_rate_domestic_cents / 100}
+                hint="For example 9.95 means USD $9.95."
+                onChange={(e) => set('shipping_rate_domestic_cents', Math.round(Number(e.target.value) * 100))}
               />
               <Field
-                label="United States rate (cents)"
+                label="United States rate (USD)"
                 type="number"
                 min={0}
-                value={settings.shipping_rate_us_cents}
-                onChange={(e) => set('shipping_rate_us_cents', Number(e.target.value))}
+                step="0.01"
+                value={settings.shipping_rate_us_cents / 100}
+                onChange={(e) => set('shipping_rate_us_cents', Math.round(Number(e.target.value) * 100))}
               />
               <Field
-                label="United Kingdom rate (cents)"
+                label="United Kingdom rate (USD)"
                 type="number"
                 min={0}
-                value={settings.shipping_rate_uk_cents}
-                onChange={(e) => set('shipping_rate_uk_cents', Number(e.target.value))}
+                step="0.01"
+                value={settings.shipping_rate_uk_cents / 100}
+                onChange={(e) => set('shipping_rate_uk_cents', Math.round(Number(e.target.value) * 100))}
               />
               <Field
-                label="International rate (cents)"
+                label="International rate (USD)"
                 type="number"
                 min={0}
-                value={settings.shipping_rate_international_cents}
-                onChange={(e) => set('shipping_rate_international_cents', Number(e.target.value))}
+                step="0.01"
+                value={settings.shipping_rate_international_cents / 100}
+                onChange={(e) => set('shipping_rate_international_cents', Math.round(Number(e.target.value) * 100))}
               />
             </div>
             <div className="mt-4 max-w-xs">

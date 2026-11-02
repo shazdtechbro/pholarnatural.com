@@ -268,13 +268,12 @@ def confirm_order_payment(db, session_id, payment_intent_id=None, provider="stri
         if discount:
             discount.used_count += 1
     queue_order_paid(db, order)
-    db.commit()
     from app.services.whatsapp import notify, NotificationEvent
 
     notify(
         NotificationEvent.NEW_ORDER,
         f"New paid order PN-{str(order.id)[:8].upper()}: {order.currency} ${order.total_cents / 100:.2f}",
-        db,
+        db, transactional=True,
     )
     for item in order.items:
         variant = variants[item.product_variant_id]
@@ -282,7 +281,7 @@ def confirm_order_payment(db, session_id, payment_intent_id=None, provider="stri
             notify(
                 NotificationEvent.LOW_STOCK,
                 f"Low stock: {item.product_name} ({item.variant_label}): {variant.stock_count}",
-                db,
+                db, transactional=True,
             )
     if (
         order.discount_id
@@ -293,8 +292,9 @@ def confirm_order_payment(db, session_id, payment_intent_id=None, provider="stri
         notify(
             NotificationEvent.DISCOUNT_MAXED_OUT,
             f"Discount {discount.code} has reached its usage limit.",
-            db,
+            db, transactional=True,
         )
+    db.commit()
     db.refresh(order)
     return order
 

@@ -16,13 +16,14 @@ def info():
     return {"provider": settings.PAYMENT_PROVIDER,
             "environment": settings.BACHS_ENVIRONMENT if settings.PAYMENT_PROVIDER == "bachs" else "legacy",
             "currency": settings.PRICING_CURRENCY,
-            "sandbox": settings.PAYMENT_SANDBOX_INSTANCE,
+            "sandbox": settings.PAYMENT_PROVIDER == "bachs" and settings.BACHS_ENVIRONMENT == "sandbox",
+            "test_mode": settings.PAYMENT_PROVIDER == "bachs" and settings.BACHS_ENVIRONMENT == "sandbox",
             "configured": bool(settings.BACHS_API_KEY and settings.BACHS_WEBHOOK_SECRET) if settings.PAYMENT_PROVIDER == "bachs" else bool(settings.STRIPE_SECRET_KEY)}
 
 
 @router.post("/sandbox/{kind}/{record_id}/refund")
 def sandbox_refund(kind: str, record_id: UUID, x_confirmation_token: str = Header(...), db: Session = Depends(get_db)):
-    if not settings.PAYMENT_SANDBOX_INSTANCE or settings.BACHS_ENVIRONMENT != "sandbox" or settings.PAYMENT_PROVIDER != "bachs":
+    if not (settings.PAYMENT_SANDBOX_INSTANCE or settings.ALLOW_SANDBOX_CHECKOUT) or settings.BACHS_ENVIRONMENT != "sandbox" or settings.PAYMENT_PROVIDER != "bachs":
         raise HTTPException(404, "Not found.")
     if kind not in ("order", "booking"):
         raise HTTPException(404, "Not found.")
@@ -43,7 +44,7 @@ def sandbox_refund(kind: str, record_id: UUID, x_confirmation_token: str = Heade
 
 @router.get("/sandbox/{kind}/{record_id}/emails")
 def sandbox_emails(kind: str, record_id: UUID, x_confirmation_token: str = Header(...), db: Session = Depends(get_db)):
-    if not settings.PAYMENT_SANDBOX_INSTANCE or settings.BACHS_ENVIRONMENT != "sandbox" or kind not in ("order", "booking"):
+    if not (settings.PAYMENT_SANDBOX_INSTANCE or settings.ALLOW_SANDBOX_CHECKOUT) or settings.BACHS_ENVIRONMENT != "sandbox" or kind not in ("order", "booking"):
         raise HTTPException(404, "Not found.")
     verify_customer_token(x_confirmation_token, kind, record_id)
     record = db.get(Order if kind == "order" else Booking, record_id)

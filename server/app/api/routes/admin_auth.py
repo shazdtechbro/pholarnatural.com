@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, StrictBool
+from uuid import UUID
 
 from app.schemas.admin import AdminCreate, AdminResponse
 from app.schemas.system import DashboardStats
@@ -99,16 +100,19 @@ def register_admin(admin_in: AdminCreate, db: Session = Depends(get_db)):
     from app.core.transactions import transaction_lock
 
     transaction_lock(db, 901)
-    if not settings.ADMIN_REGISTRATION_KEY or not secrets.compare_digest(
-        admin_in.secret_key, settings.ADMIN_REGISTRATION_KEY
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Invalid admin registration key.",
-        )
-
-    if db.query(AdminUser).first():
-        raise HTTPException(status_code=409, detail="An administrator already exists.")
+    import hashlib
+    from datetime import datetime, timezone
+    from app.models.admin import AdminInvitation
+    invitation = db.query(AdminInvitation).filter_by(token_hash=hashlib.sha256(admin_in.secret_key.encode()).hexdigest(), purpose="invite").with_for_update().first()
+    if invitation:
+        if invitation.used or invitation.email.lower() != str(admin_in.email).lower() or invitation.expires_at.replace(tzinfo=timezone.utc) <= datetime.now(timezone.utc):
+            raise HTTPException(403, "Invitation is invalid or expired.")
+        invitation.used = True
+    else:
+        if not settings.ADMIN_REGISTRATION_KEY or not secrets.compare_digest(admin_in.secret_key, settings.ADMIN_REGISTRATION_KEY):
+            raise HTTPException(403, "Invitation is invalid or expired.")
+        if db.query(AdminUser).first():
+            raise HTTPException(409, "Ask an existing administrator to invite you from Settings.")
 
     # 2. Check if email already exists
     existing_admin = (
@@ -194,5 +198,121 @@ def change_password(
             ],
         ),
     )
+    db.commit()
+    return {"ok": True}
+
+
+class InvitationCreate(BaseModel):
+    email: EmailStr
+    current_password: str
+
+
+@router.get("/team")
+def team(db: Session = Depends(get_db), current_admin: AdminUser = Depends(get_current_admin)):
+    return [{"id": str(a.id), "email": a.email, "is_active": a.is_active} for a in db.query(AdminUser).order_by(AdminUser.created_at).all()]
+
+
+@router.post("/invitations", status_code=202)
+def invite_admin(body: InvitationCreate, db: Session = Depends(get_db), current_admin: AdminUser = Depends(get_current_admin)):
+    import hashlib, secrets
+    from datetime import datetime, timezone
+    from urllib.parse import urlencode
+    from sqlalchemy import func
+    from app.models.admin import AdminInvitation
+    from app.services.email import queue_email, message, e
+    from app.core.transactions import transaction_lock
+    if not security.verify_password(body.current_password, current_admin.hashed_password):
+        raise HTTPException(403, "Current password is incorrect.")
+    transaction_lock(db, 901)
+    address = str(body.email).lower()
+    if db.query(AdminUser).filter(func.lower(AdminUser.email) == address).first():
+        raise HTTPException(409, "An administrator with this email already exists.")
+    db.query(AdminInvitation).filter_by(email=address, used=False).update({"used": True})
+    token = secrets.token_urlsafe(32)
+    invitation = AdminInvitation(email=address, token_hash=hashlib.sha256(token.encode()).hexdigest(), expires_at=datetime.now(timezone.utc)+timedelta(hours=48))
+    db.add(invitation); db.flush()
+    url = settings.DOMAIN+"/admin/register#"+urlencode({"invite": token, "email": address})
+    title, html = message("Your Pholar Natural admin invitation", ["An administrator invited you to manage Pholar Natural. This grants full dashboard access. Choose your own password using the invitation link. The link expires in 48 hours and works once. If this was unexpected, ignore it."])
+    queue_email(db, "admin-invite:"+str(invitation.id), address, title, html.replace("</body>", '<p><a href="'+e(url)+'">Create my administrator account</a></p></body>'))
+    db.commit()
+    return {"queued": True, "expires_in_hours": 48}
+
+
+class AdminAccess(BaseModel):
+    is_active: StrictBool
+    current_password: str
+
+
+@router.post("/team/{admin_id}/access")
+def admin_access(admin_id: UUID, body: AdminAccess, db: Session = Depends(get_db), current_admin: AdminUser = Depends(get_current_admin)):
+    from app.core.transactions import transaction_lock
+    if not security.verify_password(body.current_password, current_admin.hashed_password):
+        raise HTTPException(403, "Current password is incorrect.")
+    transaction_lock(db, 901)
+    target = db.query(AdminUser).filter_by(id=admin_id).with_for_update().first()
+    if not target:
+        raise HTTPException(404, "Administrator not found.")
+    if not body.is_active and target.is_active and db.query(AdminUser).filter_by(is_active=True).count() <= 1:
+        raise HTTPException(409, "Keep at least one active administrator.")
+    target.is_active = body.is_active
+    target.token_version += 1
+    db.commit()
+    return {"ok": True}
+
+
+class AdminRecoveryRequest(BaseModel):
+    email: EmailStr
+
+
+class AdminRecoveryComplete(BaseModel):
+    token: str
+    password: str
+
+
+@router.post("/forgot-password", status_code=202)
+def admin_forgot_password(body: AdminRecoveryRequest, db: Session = Depends(get_db)):
+    import hashlib, secrets
+    from datetime import datetime, timezone
+    from urllib.parse import urlencode
+    from app.models.admin import AdminInvitation
+    from app.services.email import queue_email, message, e
+    from app.core.transactions import transaction_lock
+    transaction_lock(db, 901)
+    admin = db.query(AdminUser).filter_by(email=str(body.email).lower(), is_active=True).first()
+    if admin:
+        db.query(AdminInvitation).filter_by(email=admin.email, purpose="password_reset", used=False).update({"used": True})
+        token = secrets.token_urlsafe(32)
+        action = AdminInvitation(email=admin.email, purpose="password_reset", token_hash=hashlib.sha256(token.encode()).hexdigest(), expires_at=datetime.now(timezone.utc)+timedelta(minutes=30))
+        db.add(action); db.flush()
+        url = settings.DOMAIN+"/admin/reset-password#"+urlencode({"token": token})
+        title, html = message("Reset your Pholar Natural admin password", ["Use this single-use link within 30 minutes to choose a new password. If you did not request a reset, ignore this email. No password has changed."])
+        queue_email(db, "admin-reset:"+str(action.id), admin.email, title, html.replace("</body>", '<p><a href="'+e(url)+'">Reset my password</a></p></body>'))
+        db.commit()
+    return {"message": "If this is an active admin account, a password reset email will arrive shortly."}
+
+
+@router.post("/reset-password")
+def admin_reset_password(body: AdminRecoveryComplete, db: Session = Depends(get_db)):
+    import hashlib
+    from datetime import datetime, timezone
+    from pydantic import ValidationError
+    from app.models.admin import AdminInvitation
+    from app.core.transactions import transaction_lock
+    from app.services.email import queue_email, message
+    transaction_lock(db, 901)
+    action = db.query(AdminInvitation).filter_by(token_hash=hashlib.sha256(body.token.encode()).hexdigest(), purpose="password_reset").with_for_update().first()
+    if not action or action.used or action.expires_at.replace(tzinfo=timezone.utc) <= datetime.now(timezone.utc):
+        raise HTTPException(400, "Reset link is invalid or expired. Request a new link.")
+    admin = db.query(AdminUser).filter_by(email=action.email, is_active=True).with_for_update().first()
+    if not admin:
+        raise HTTPException(400, "Reset link is invalid or expired. Request a new link.")
+    try:
+        AdminCreate(email=admin.email, password=body.password, secret_key="validation-only")
+    except ValidationError:
+        raise HTTPException(422, "Use at least 12 characters and at most 72 UTF-8 bytes.")
+    admin.hashed_password = security.get_password_hash(body.password)
+    admin.token_version += 1
+    action.used = True
+    queue_email(db, "admin-reset-done:"+str(action.id), admin.email, *message("Administrator password changed", ["Your administrator password changed. All previous sessions have been signed out. If this was not you, contact another administrator immediately."]))
     db.commit()
     return {"ok": True}

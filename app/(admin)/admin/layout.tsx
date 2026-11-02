@@ -1,3 +1,4 @@
+import PaymentModeNotice from '@/components/PaymentModeNotice'
 import type { Metadata } from 'next'
 import AdminShell from '@/components/admin/AdminShell'
 import { AdminAuthProvider } from '@/context/AdminAuthContext'
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <AdminAuthProvider>
-      <AdminShell>{children}</AdminShell>
+      <AdminShell><PaymentModeNotice />{children}</AdminShell>
     </AdminAuthProvider>
   )
 }

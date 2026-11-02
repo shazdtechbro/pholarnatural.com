@@ -112,7 +112,7 @@ class BachsGateway(PaymentGateway):
             if row.get("status") in ("processing", "pending", "success") and (row.get("reference") == "pholar-full-"+charge or payment.get("status") in ("refunded", "auto_refunded")):
                 return {"refund_id": resource_id(row.get("refund_id")), "status": "succeeded" if row.get("status") == "success" else "pending"}
             raise BachsError("REFUND_REQUIRES_REVIEW")
-        body = {"charge_id": charge, "reference": "pholar-full-"+charge, "reason": "Customer cancellation"}
+        body = {"charge_id": charge, "reference": "pholar-full-"+charge, "reason": "Customer cancellation", "idempotency_key": "pholar-full-"+charge}
         if self.environment == "sandbox":
             body["simulated_outcome"] = "success"
         if amount_cents is not None:

@@ -1,3 +1,4 @@
+import PaymentModeNotice from '@/components/PaymentModeNotice'
 import StorefrontRefresh from '@/components/StorefrontRefresh'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
@@ -19,6 +20,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
       <StorefrontRefresh />
       <Navbar />
       <main id="main" className="pt-[73px]">
+        <PaymentModeNotice />
         {children}
       </main>
       <Footer />

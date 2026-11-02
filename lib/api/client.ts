@@ -1,3 +1,5 @@
+import { unstable_rethrow } from 'next/navigation'
+
 /**
  * Centralized HTTP client for the Pholar Natural FastAPI backend.
  *
@@ -95,13 +97,19 @@ export async function apiClient<T>(path: string, options: ApiClientOptions = {})
     if (token) headers['Authorization'] = `Bearer ${token}`
   }
 
-  const response = await fetch(`${BASE}${path}`, {
+  let response: Response
+  try {
+    response = await fetch(`${BASE}${path}`, {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
     cache: 'no-store',
     signal: AbortSignal.timeout(15000),
-  })
+    })
+  } catch (error) {
+    unstable_rethrow(error)
+    throw new ApiError(0, 'The connection was interrupted. Your request may have reached the server. Check the result, then retry the same checkout if needed.')
+  }
 
   if (!response.ok) {
     if (auth && response.status === 401 && typeof window !== 'undefined') {

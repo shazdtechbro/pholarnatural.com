@@ -12,6 +12,8 @@ class SecurityMiddleware(BaseHTTPMiddleware):
     _lock = threading.Lock()
 
     async def dispatch(self, request, call_next):
+        from uuid import uuid4
+        request.state.request_id = str(uuid4())
         path = request.url.path
         limit = (
             600
@@ -62,8 +64,24 @@ class SecurityMiddleware(BaseHTTPMiddleware):
                 chunks.append(chunk)
             request._body = b"".join(chunks)
         response = await call_next(request)
+        response.headers["X-Request-ID"] = request.state.request_id
+        if request.method not in ("GET", "HEAD", "OPTIONS") and getattr(request.state, "admin_id", None):
+            from starlette.concurrency import run_in_threadpool
+            await run_in_threadpool(record_admin_audit, request.state.admin_id, request.method, path, request.state.request_id, response.status_code)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Cache-Control"] = "no-store"
         return response
+
+
+def record_admin_audit(admin_id, method, path, request_id, status_code):
+    import logging
+    from app.db.database import SessionLocal
+    from app.models.admin import AdminAudit
+    try:
+        with SessionLocal() as db:
+            db.add(AdminAudit(admin_id=admin_id, method=method, path=path[:255], request_id=request_id, status_code=status_code))
+            db.commit()
+    except Exception:
+        logging.getLogger(__name__).error("Admin audit persistence failed request=%s", request_id)

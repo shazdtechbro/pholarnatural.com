@@ -45,6 +45,9 @@ def message(title, lines):
 
 
 def queue_email(db, key, recipient, subject, html):
+    if settings.PAYMENT_PROVIDER == "bachs" and settings.BACHS_ENVIRONMENT == "sandbox" and key.startswith(("order:", "booking:", "bachs", "reminder/")) and not subject.startswith("[TEST]"):
+        subject = "[TEST] " + subject
+
     if settings.PAYMENT_SANDBOX_INSTANCE:
         subject = "[SANDBOX] " + subject
         # Keep composed emails inspectable without delivering test receipts or reminders.
@@ -73,12 +76,16 @@ def queue_email(db, key, recipient, subject, html):
     )
 
 
+def admin_recipients(db):
+    from app.models.admin import AdminUser
+    addresses = {row.email.strip().lower() for row in db.query(AdminUser).filter(AdminUser.is_active.is_(True)).all()}
+    if not addresses:
+        addresses.update(s.strip().lower() for s in (settings.ADMIN_EMAIL or "").split(",") if s.strip())
+    return sorted(addresses)
+
+
 def queue_admin(db, key, content, force=False):
-    if not force and get_setting(db, "email_notifications_enabled", "true") != "true":
-        return
-    recipients = [
-        s.strip() for s in (settings.ADMIN_EMAIL or "").split(",") if s.strip()
-    ]
+    recipients = admin_recipients(db)
     # Do not silently drop business alerts before recipients have been configured.
     if not recipients:
         queue_email(db, key + ":admin:unconfigured", "__admin__", *content)

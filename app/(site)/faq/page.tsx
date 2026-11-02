@@ -8,7 +8,7 @@ import { FAQS } from '@/lib/faq'
 export const metadata: Metadata = {
   title: 'FAQ',
   description:
-    'Answers about Pholar Natural products, booking and appointments, shipping, payments and returns. All prices in CAD.',
+    'Answers about Pholar Natural products, booking and appointments, shipping, payments and returns. All prices in USD.',
   alternates: { canonical: '/faq' },
   openGraph: {
     title: 'FAQ | Pholar Natural',

@@ -17,6 +17,9 @@ def create_order(
     payment_gateway=Depends(get_payment_gateway),
 ):
     order, url = order_service.create_order_checkout(db, order_in, payment_gateway, idempotency_key)
+    from app.services.email import queue_admin, message
+    queue_admin(db, f"order:{order.id}:created", message("New order awaiting payment", [f"Reference PN-{str(order.id)[:8].upper()}", "A checkout was created. Do not fulfil it until payment is confirmed."]))
+    db.commit()
     return OrderCheckoutResponse(
         order_id=order.id,
         checkout_url=url,

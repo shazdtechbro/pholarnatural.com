@@ -5,7 +5,7 @@
  * rather than a hunt through components.
  */
 
-export const CURRENCY: 'USD' | 'CAD' = process.env.NEXT_PUBLIC_CURRENCY === 'USD' ? 'USD' : 'CAD'
+export const CURRENCY: 'USD' | 'CAD' = process.env.NEXT_PUBLIC_CURRENCY === 'CAD' ? 'CAD' : 'USD'
 
 /** doc §1.6.4 — bookings are held with a 10% deposit. */
 export const DEPOSIT_RATE = 0.1

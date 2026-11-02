@@ -163,11 +163,14 @@ def email_status(
     db: Session = Depends(get_db), current_admin: AdminUser = Depends(get_current_admin)
 ):
     from app.core.config import settings
-    from app.models.notification import EmailDelivery
+    from app.models.notification import EmailDelivery, WhatsAppDelivery
+    from app.services.email import admin_recipients
 
     return {
+        "whatsapp_needs_attention": db.query(WhatsAppDelivery).filter_by(status="needs_review").count(),
         "configured": bool(settings.RESEND_API_KEY),
-        "admin_recipient_configured": bool(settings.ADMIN_EMAIL),
+        "admin_recipient_configured": bool(admin_recipients(db)),
+        "admin_recipients": admin_recipients(db),
         "queued": db.query(EmailDelivery)
         .filter(EmailDelivery.status == "queued")
         .count(),

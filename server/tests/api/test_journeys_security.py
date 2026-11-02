@@ -201,7 +201,7 @@ def test_payment_webhook_validation_and_idempotency(
     emails = db_session.query(EmailDelivery).count()
     assert signed(client, event).status_code == 200
     assert catalogue[1].stock_count == 1
-    assert db_session.query(EmailDelivery).count() == emails == 2
+    assert db_session.query(EmailDelivery).count() == emails == 3
     event["data"]["object"]["amount_total"] += 1
     assert signed(client, event).status_code == 400
     assert (
@@ -508,7 +508,7 @@ def test_registration_does_not_log_input(client, db_session, capsys):
     assert "long-test-password" not in capsys.readouterr().out
 
 
-def test_email_toggle_keeps_customer_receipt(
+def test_operational_admin_alerts_cannot_be_disabled_by_legacy_toggle(
     client, gateway, catalogue, db_session, admin
 ):
     assert (
@@ -518,8 +518,8 @@ def test_email_toggle_keeps_customer_receipt(
         == 200
     )
     paid_order(client, db_session, gateway, catalogue[1])
-    assert db_session.query(EmailDelivery).count() == 1
-    assert db_session.query(EmailDelivery).one().recipient == "buyer@example.com"
+    assert db_session.query(EmailDelivery).count() == 3
+    assert db_session.query(EmailDelivery).filter_by(recipient="buyer@example.com").count() == 1
 
 
 def test_product_metadata_and_image_ordering(client, admin, db_session, catalogue):
@@ -658,7 +658,7 @@ def test_all_order_status_emails_and_unpaid_revenue(
             f"/api/v1/admin/orders/{order.id}/status", json={"status": state}
         )
         assert response.status_code == 200, response.text
-    assert db_session.query(EmailDelivery).count() == 10
+    assert db_session.query(EmailDelivery).count() == 12
     stats = client.get("/api/v1/admin/dashboard").json()
     assert stats["revenue_total_cents"] == order.total_cents
 

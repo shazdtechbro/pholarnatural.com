@@ -46,7 +46,7 @@ export default function Home() {
               addressCountry: 'CA',
             },
             priceRange: '$$',
-            currenciesAccepted: 'CAD',
+            currenciesAccepted: 'USD',
             openingHoursSpecification: [
               {
                 '@type': 'OpeningHoursSpecification',

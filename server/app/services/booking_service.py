@@ -206,14 +206,14 @@ def confirm_booking_payment_intent(db, payment_intent_id, payment_gateway=None, 
         return None
     booking.status = "confirmed"
     queue_booking_confirmed(db, booking)
-    db.commit()
     from app.services.whatsapp import notify, NotificationEvent
 
     notify(
         NotificationEvent.NEW_BOOKING,
         f"New booking PN-{str(booking.id)[:8].upper()}: {booking.booking_date} {booking.start_time}",
-        db,
+        db, transactional=True,
     )
+    db.commit()
     db.refresh(booking)
     return booking
 
@@ -320,14 +320,14 @@ def cancel_booking(
         booking.status = "cancelled"
     booking.cancellation_reason = cancellation_reason
     queue_booking_cancelled(db, booking, message)
-    db.commit()
     from app.services.whatsapp import notify, NotificationEvent
 
     notify(
         NotificationEvent.BOOKING_CANCELLED,
         f"Booking PN-{str(booking.id)[:8].upper()} cancelled. {message}",
-        db,
+        db, transactional=True,
     )
+    db.commit()
     db.refresh(booking)
     return booking, refunded, message
 

@@ -18,6 +18,8 @@ from uuid import uuid4
 @pytest.fixture
 def db_session():
     engine = create_engine('sqlite://', connect_args={'check_same_thread': False}, poolclass=StaticPool)
+    from app.models.admin import AdminUser
+    AdminUser.__table__.create(engine)
     EmailJob.__table__.create(engine)
     Subscriber.__table__.create(engine)
     with Session(engine) as session:

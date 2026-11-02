@@ -1,3 +1,4 @@
+import { unstable_rethrow } from 'next/navigation'
 import { CURRENCY } from '@/lib/config'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -25,7 +26,7 @@ type SocialLinks = {
 }
 
 async function getSocialLinks(): Promise<SocialLinks> {
-  const settings = await getPublicSettings()
+  const settings = await getPublicSettings().catch(error => { unstable_rethrow(error); return {} as Record<string, string> })
   return {
     instagram_url: settings.instagram_url ?? '',
     facebook_url: settings.facebook_url ?? '',
@@ -35,7 +36,7 @@ async function getSocialLinks(): Promise<SocialLinks> {
 
 export default async function Footer() {
   const year = new Date().getFullYear()
-  const [social, services] = await Promise.all([getSocialLinks(), getServices()])
+  const [social, services] = await Promise.all([getSocialLinks(), getServices().catch(error => { unstable_rethrow(error); return [] })])
 
   return (
     <footer className="border-t border-outline-variant bg-surface-container-low">

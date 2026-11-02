@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { UserPlus, AlertCircle, CheckCircle2, ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react'
 import { Field } from '@/components/FormField'
 import { adminRegister } from '@/lib/api/admin'
@@ -19,6 +19,12 @@ export default function AdminRegisterPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.hash.slice(1))
+    const invite = params.get('invite'), address = params.get('email')
+    if (invite && address) { setSecretKey(invite); setEmail(address); window.history.replaceState(null, '', window.location.pathname) }
+  }, [])
+
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -152,7 +158,7 @@ export default function AdminRegisterPage() {
             />
 
             <Field
-              label="Secret key"
+              label="Invitation code"
               type="password"
               required
               value={secretKey}
@@ -161,8 +167,8 @@ export default function AdminRegisterPage() {
                 setError(null)
               }}
               autoComplete="off"
-              placeholder="Ask your developer for this key"
-              hint="Contact your developer to obtain the registration secret key."
+              placeholder="Open your private invitation email"
+              hint="An existing administrator invites you from Settings. Invitations expire in 48 hours."
             />
 
             <button

@@ -7,11 +7,11 @@ import { CURRENCY } from '@/lib/config'
 export const metadata: Metadata = {
   title: 'Shop',
   description:
-    'Curated botanical formulations rooted in African tradition and refined by clinical excellence. Shop the Restorative Hair Oil and Botanical Cleanse Shampoo. All prices in CAD.',
+    'Curated botanical formulations rooted in African tradition and refined by clinical excellence. Shop the Restorative Hair Oil and Botanical Cleanse Shampoo. All prices in USD.',
   alternates: { canonical: '/shop' },
   openGraph: {
     title: 'Shop | Pholar Natural',
-    description: 'Curated botanical haircare formulations. All prices in CAD.',
+    description: 'Curated botanical haircare formulations. All prices in USD.',
     url: '/shop',
   },
 }

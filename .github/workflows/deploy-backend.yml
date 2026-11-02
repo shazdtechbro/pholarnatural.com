@@ -67,14 +67,14 @@ jobs:
           set -eu
           cd ~/pholarnatural.com/server
           git pull --ff-only origin main
-          docker compose build api mail-worker payment-worker
+          docker compose build api mail-worker payment-worker whatsapp-worker
           docker compose run --rm --no-deps api alembic upgrade head < /dev/null
-          docker compose up -d api mail-worker
+          docker compose up -d api mail-worker whatsapp-worker
           if docker compose exec -T api python -c 'from app.core.config import settings; raise SystemExit(0 if settings.PAYMENT_PROVIDER == "bachs" else 1)'; then
             docker compose up -d payment-worker
           fi
           for attempt in $(seq 1 20); do
-            if curl --fail --silent --max-time 5 http://127.0.0.1:8000/health > /dev/null; then exit 0; fi
+            if curl --fail --silent --max-time 5 http://127.0.0.1:8000/ready > /dev/null; then exit 0; fi
             sleep 2
           done
           exit 1

@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import { apiClient } from '@/lib/api/client'
 export default function EmailStatus() {
   const [status, setStatus] = useState<{
+    whatsapp_needs_attention: number
+    admin_recipients: string[]
     configured: boolean
     admin_recipient_configured: boolean
     queued: number
@@ -42,11 +44,13 @@ export default function EmailStatus() {
           ? `${status.configured ? 'Email provider configured' : 'Email provider not configured'} · ${status.admin_recipient_configured ? 'Admin recipients configured' : 'Admin recipients not configured'}`
           : 'Checking email delivery…'}
       </p>
+      {status && <p className="text-sm break-words">Alerts go to: {status.admin_recipients?.join(', ') || 'No active admin accounts'}</p>}
       {status && (
         <p>
           {status.queued} queued · {status.retrying} retrying · {status.sent} accepted by provider · {status.delivered} delivered · {status.needs_attention} need attention
         </p>
       )}
+      {status && status.whatsapp_needs_attention > 0 && <p role="alert">{status.whatsapp_needs_attention} WhatsApp alerts need attention. Check the linked number and contact support.</p>}
       <button
         type="button"
         disabled={busy || !status?.configured}

@@ -1,5 +1,5 @@
 from typing import Generator
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 import jwt
 from jwt import InvalidTokenError as JWTError
@@ -54,7 +54,7 @@ def get_notification_service() -> NotificationService:
 
 
 def get_current_admin(
-    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
+    request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
 ) -> AdminUser:
     """
     Dependency to get the current authenticated admin user.
@@ -91,4 +91,5 @@ def get_current_admin(
     ):
         raise credentials_exception
 
+    request.state.admin_id = str(admin.id)
     return admin

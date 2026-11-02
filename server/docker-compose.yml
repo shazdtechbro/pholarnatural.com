@@ -76,6 +76,24 @@ services:
     networks:
       - internal
 
+  whatsapp-worker:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    command: ["python", "-m", "app.services.whatsapp"]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+
   evolution-api:
     image: evoapicloud/evolution-api:v2.3.4
     restart: unless-stopped

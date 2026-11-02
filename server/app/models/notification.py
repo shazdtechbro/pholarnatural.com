@@ -27,3 +27,16 @@ class EmailDelivery(Base):
     payload = Column(JSON)
     first_attempt_at = Column(DateTime(timezone=True))
     reply_to = Column(String(255))
+
+
+class WhatsAppDelivery(Base):
+    __tablename__ = "whatsapp_deliveries"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    event_key = Column(String(64), unique=True, nullable=False)
+    recipient = Column(String(20), nullable=False)
+    message = Column(Text, nullable=False)
+    status = Column(String(20), nullable=False, default="queued", index=True)
+    attempts = Column(Integer, nullable=False, default=0)
+    next_attempt_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    last_error = Column(String(255))

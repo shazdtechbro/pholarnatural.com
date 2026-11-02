@@ -2,7 +2,7 @@
 WhatsApp notification service using Evolution API instance "pholar-notifier".
 
 Public API:
-  notify(event, message, db)              fire-and-forget alert, never raises
+  notify(event, message, db)              queue a durable operational alert
   get_whatsapp_connection_status()        check connection health
   get_whatsapp_qr()                       fetch QR for pairing
   logout_whatsapp()                       disconnect instance (raises on failure)
@@ -188,16 +188,12 @@ def send_whatsapp_notification(number: str, message: str) -> None:
     _post(f"/message/sendText/{INSTANCE_NAME}", {"number": number, "text": message})
 
 
-def notify(event: NotificationEvent, message: str, db: Session) -> None:
+def notify(event: NotificationEvent, message: str, db: Session, transactional=False) -> None:
     if settings.PAYMENT_SANDBOX_INSTANCE:
         return
-    """
-    Fire-and-forget WhatsApp notification — the sole entry point for alerts.
-
-    Reads the per-event toggle and notifier number from admin_settings
-    synchronously (fast DB lookup), then spawns a daemon thread for the
-    HTTP call so it never delays the HTTP response. Never raises.
-    """
+    # Core payment transitions enqueue in their own database transaction.
+    if settings.PAYMENT_PROVIDER == "bachs" and settings.BACHS_ENVIRONMENT == "sandbox":
+        message = "[TEST PAYMENT MODE] " + message
     from app.services.settings_service import get_setting  # noqa: PLC0415
 
     try:
@@ -213,11 +209,59 @@ def notify(event: NotificationEvent, message: str, db: Session) -> None:
         )
         return
 
-    def _send() -> None:
-        try:
-            send_whatsapp_notification(number=number, message=message)
-            logger.debug("WhatsApp sent for %s", event)
-        except Exception as exc:
-            logger.error("WhatsApp send failed for %s: %s", event, type(exc).__name__)
+    # Persist alerts rather than losing them when an HTTP worker restarts.
+    import hashlib
+    from app.models.notification import WhatsAppDelivery
+    key = hashlib.sha256((event.value+":"+number+":"+message).encode()).hexdigest()
+    if transactional:
+        if not any(isinstance(row, WhatsAppDelivery) and row.event_key == key for row in db.new) and not db.query(WhatsAppDelivery.id).filter_by(event_key=key).first():
+            db.add(WhatsAppDelivery(event_key=key, recipient=number, message=message))
+        return
+    try:
+        if not db.query(WhatsAppDelivery.id).filter_by(event_key=key).first():
+            db.add(WhatsAppDelivery(event_key=key, recipient=number, message=message))
+            db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.error("WhatsApp enqueue failed: %s", type(exc).__name__)
 
-    threading.Thread(target=_send, daemon=True).start()
+
+def process_one(db, sender=None):
+    from datetime import timedelta
+    from app.services.mail_delivery import utcnow
+    from app.models.notification import WhatsAppDelivery
+    now = utcnow()
+    row = db.query(WhatsAppDelivery).filter(WhatsAppDelivery.status.in_(["queued", "sending"]), WhatsAppDelivery.next_attempt_at <= now).order_by(WhatsAppDelivery.created_at).with_for_update(skip_locked=True).first()
+    if not row:
+        db.rollback(); return False
+    row.status = "sending"; row.attempts += 1; row.next_attempt_at = now+timedelta(seconds=90)
+    db.commit()
+    try:
+        (sender or send_whatsapp_notification)(row.recipient, row.message)
+        row.status = "sent"; row.last_error = None
+    except Exception as error:
+        row.status = "needs_review" if row.attempts >= 10 else "queued"
+        row.last_error = type(error).__name__
+        row.next_attempt_at = utcnow()+timedelta(seconds=min(3600, 15*2**min(row.attempts, 8)))
+    db.commit()
+    return True
+
+
+def main():
+    import signal
+    from app.db.database import SessionLocal
+    stop = threading.Event()
+    signal.signal(signal.SIGTERM, lambda *_: stop.set())
+    signal.signal(signal.SIGINT, lambda *_: stop.set())
+    while not stop.is_set():
+        try:
+            with SessionLocal() as db:
+                busy = process_one(db)
+        except Exception:
+            logger.error("WhatsApp queue unavailable; retrying")
+            busy = False
+        stop.wait(1 if busy else 5)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.booking import Booking
@@ -24,6 +24,7 @@ def get_dashboard_stats(db: Session) -> dict:
         .filter(
             func.date(Order.created_at) == today,
             Order.currency == settings.PRICING_CURRENCY,
+            or_(Order.payment_provider != "bachs", Order.payment_environment != "sandbox") if settings.PAYMENT_PROVIDER == "bachs" and settings.BACHS_ENVIRONMENT == "live" else True,
             Order.status.in_(
                 ["paid", "confirmed", "processing", "shipped", "delivered"]
             ),
@@ -36,6 +37,7 @@ def get_dashboard_stats(db: Session) -> dict:
         db.query(func.sum(Order.total_cents))
         .filter(
             Order.currency == settings.PRICING_CURRENCY,
+            or_(Order.payment_provider != "bachs", Order.payment_environment != "sandbox") if settings.PAYMENT_PROVIDER == "bachs" and settings.BACHS_ENVIRONMENT == "live" else True,
             Order.status.in_(
                 ["paid", "confirmed", "processing", "shipped", "delivered"]
             )

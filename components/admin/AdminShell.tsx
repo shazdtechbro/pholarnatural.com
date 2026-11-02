@@ -29,20 +29,14 @@ const NAV = [
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ] as const
 
-/**
- * Admin chrome and the client-side auth gate (doc §1.14, §2.0 task 4.1).
- *
- * The gate redirects unauthenticated visitors to `/admin/login`. It is a stub — see the warning
- * in `context/AdminAuthContext.tsx`. The banner at the top of every admin screen says so, on
- * purpose: this must not be mistaken for a secured area during a client demo.
- */
+/** Navigation guard; every protected backend request independently validates the admin session. */
 export default function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const { authenticated, ready, signOut } = useAdminAuth()
   const [open, setOpen] = useState(false)
 
-  const isPublicPage = pathname === '/admin/login' || pathname === '/admin/register'
+  const isPublicPage = pathname === '/admin/login' || pathname === '/admin/register' || pathname === '/admin/forgot-password' || pathname === '/admin/reset-password'
 
   useEffect(() => {
     if (ready && !authenticated && !isPublicPage) router.replace('/admin/login')

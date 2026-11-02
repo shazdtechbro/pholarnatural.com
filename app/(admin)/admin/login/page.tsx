@@ -105,6 +105,7 @@ export default function AdminLoginPage() {
               {loading ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
+          <Link href="/admin/forgot-password" className="mt-5 block text-center text-sm text-primary underline">Forgot your password?</Link>
 
           <p className="mt-6 text-center font-body-md text-[13px] text-on-surface-variant">
             Need an account?{' '}

@@ -137,11 +137,14 @@ def handle(db, event, gateway):
     elif event.kind in ("collection.failed", "checkout.expired", "collection.underpaid"):
         record = record_for(db, "payment_checkout_id", data.get("checkout_id"))
         if record and record.status == "pending":
-            if event.kind == "checkout.expired":
-                checkout = gateway.request("GET", "/v1/checkout-sessions/"+resource_id(record.payment_checkout_id))
-                if checkout.get("status") == "expired":
-                    record.status = "expired" if isinstance(record, Order) else "cancelled"
+            checkout = gateway.request("GET", "/v1/checkout-sessions/"+resource_id(record.payment_checkout_id))
+            if checkout.get("payment_status") == "succeeded":
+                return
+            if event.kind == "checkout.expired" and checkout.get("status") == "expired":
+                record.status = "expired" if isinstance(record, Order) else "cancelled"
             queue_payment_failed(db, record, "order" if isinstance(record, Order) else "booking")
+            from app.services.whatsapp import notify, NotificationEvent
+            notify(NotificationEvent.PAYMENT_FAILED, f"Payment not completed for PN-{str(record.id)[:8].upper()}", db, transactional=True)
             db.commit()
     elif event.kind.startswith("dispute."):
         alert(db, event, "Payment dispute needs attention", "Review this dispute and its evidence deadline in the Bachs dashboard.")
