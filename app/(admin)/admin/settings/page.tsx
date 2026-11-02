@@ -504,8 +504,8 @@ export default function AdminSettingsPage() {
             </h2>
             <p className="my-4 text-sm leading-6">Operational order and appointment alerts are sent automatically to every active admin account. Manage recipients in Your admin team above.</p>
             <p>
-              Customers always receive transactional payment, order and appointment emails. Turning
-              off admin alerts does not turn off customer receipts.
+              Customer payment, order and appointment emails are sent independently
+              of your WhatsApp notification preferences.
             </p>
             <EmailStatus />
           </section>
@@ -728,11 +728,8 @@ export default function AdminSettingsPage() {
               Business hours
             </h2>
             <p className="font-body-md text-body-md text-on-surface-variant">
-              Mon–Sat, 10:00–17:00. Sundays closed. Slot times are fixed in{' '}
-              <code className="rounded bg-surface-container-high px-1.5 py-0.5 font-mono text-[12px]">
-                lib/config.ts
-              </code>
-              .
+              Mon–Sat, 10:00–17:00 in Toronto time. Sundays closed. Use Bookings
+              to block dates when you are unavailable.
             </p>
           </section>
 
