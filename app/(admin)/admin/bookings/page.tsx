@@ -393,7 +393,7 @@ export default function AdminBookingsPage() {
               <tbody>
                 {visible.map((b) => (
                   <tr key={b.id}>
-                    <Td className="font-semibold text-primary">{b.reference}{b.payment_environment === 'sandbox' && <span className="ml-2 rounded bg-secondary/10 px-2 py-1 text-xs">TEST</span>}</Td>
+                    <Td className="font-semibold text-primary">{b.reference}</Td>
                     <Td>
                       <span className="block font-semibold text-on-surface">{b.customer_name}</span>
                       <span className="block text-[12px]">{b.customer_email}</span>

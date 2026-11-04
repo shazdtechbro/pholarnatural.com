@@ -8,6 +8,7 @@ import { UserPlus, AlertCircle, CheckCircle2, ArrowLeft, Loader2, Eye, EyeOff } 
 import { Field } from '@/components/FormField'
 import { adminRegister } from '@/lib/api/admin'
 import { useHydrated } from '@/lib/use-hydrated'
+import AdminJoin from '@/components/admin/AdminJoin'
 
 /** Admin account registration (requires the developer-issued secret key). */
 export default function AdminRegisterPage() {
@@ -17,6 +18,7 @@ export default function AdminRegisterPage() {
 
 function AdminRegisterForm() {
   const router = useRouter()
+  const [joinKey] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('join') ?? '')
   const [email, setEmail] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('email') ?? '')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -52,6 +54,8 @@ function AdminRegisterForm() {
       setLoading(false)
     }
   }
+
+  if (joinKey) return <AdminJoin joinKey={joinKey} />
 
   if (success) {
     return (

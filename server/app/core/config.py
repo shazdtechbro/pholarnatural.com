@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     ALGORITHM: Literal["HS256"] = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=60, ge=5, le=1440)
     ADMIN_REGISTRATION_KEY: str
+    ADMIN_JOIN_LINK_HASH: str = Field(default="", pattern=r"^(?:[a-f0-9]{64})?$")
 
     # Cloudinary
     CLOUDINARY_CLOUD_NAME: Optional[str] = None

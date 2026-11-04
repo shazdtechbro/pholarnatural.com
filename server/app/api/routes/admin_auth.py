@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
-from pydantic import BaseModel, EmailStr, StrictBool
+from pydantic import BaseModel, EmailStr, StrictBool, Field
 from uuid import UUID
 
 from app.schemas.admin import AdminCreate, AdminResponse
@@ -205,6 +205,52 @@ def change_password(
 class InvitationCreate(BaseModel):
     email: EmailStr
     current_password: str
+
+
+class AdminJoinRequest(BaseModel):
+    email: EmailStr
+    join_key: str = Field(min_length=32, max_length=512)
+
+
+@router.post("/join", status_code=202)
+def request_admin_join(body: AdminJoinRequest, db: Session = Depends(get_db)):
+    """A reusable bearer link requests an email-bound, single-use verification invite."""
+    import hashlib, secrets
+    from datetime import datetime, timezone
+    from urllib.parse import urlencode
+    from sqlalchemy import func
+    from app.models.admin import AdminInvitation
+    from app.services.email import queue_email, message, e
+    from app.core.transactions import transaction_lock
+
+    digest = hashlib.sha256(body.join_key.encode()).hexdigest()
+    if not settings.ADMIN_JOIN_LINK_HASH or not secrets.compare_digest(digest, settings.ADMIN_JOIN_LINK_HASH):
+        raise HTTPException(403, "This administrator join link is invalid or no longer available.")
+    transaction_lock(db, 901)
+    address = str(body.email).lower()
+    result = {"message": "Check your inbox for your private email-verification link. If you already have an admin account, sign in or reset your password."}
+    if db.query(AdminUser).filter(func.lower(AdminUser.email) == address).first():
+        return result
+    now = datetime.now(timezone.utc)
+    recent = db.query(AdminInvitation).filter(
+        AdminInvitation.email == address, AdminInvitation.purpose == "invite",
+        AdminInvitation.used.is_(False), AdminInvitation.created_at > now-timedelta(seconds=60),
+    ).first()
+    if recent:
+        return result
+    db.query(AdminInvitation).filter_by(email=address, purpose="invite", used=False).update({"used": True})
+    token = secrets.token_urlsafe(32)
+    invitation = AdminInvitation(email=address, token_hash=hashlib.sha256(token.encode()).hexdigest(), expires_at=now+timedelta(hours=48))
+    db.add(invitation); db.flush()
+    url = settings.DOMAIN+"/admin/register#"+urlencode({"invite": token, "email": address})
+    title, html = message("Verify your email to join Pholar Natural admin", [
+        "You requested administrator access using the private Pholar Natural join link.",
+        "Open the link below to verify this email and choose your password. The account has full dashboard access. This email link expires in 48 hours and works once.",
+        "If you did not request access, ignore this email. No account has been created.",
+    ])
+    queue_email(db, "admin-join:"+str(invitation.id), address, title, html.replace("</body>", '<p><a href="'+e(url)+'">Verify email and create my admin account</a></p></body>'))
+    db.commit()
+    return result
 
 
 @router.get("/team")

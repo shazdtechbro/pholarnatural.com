@@ -89,6 +89,50 @@ def test_admin_operations_require_auth(client):
     assert client.post('/api/v1/admin/invitations',json={'email':'new@example.com','current_password':PASSWORD}).status_code in (401,403)
 
 
+def test_reusable_join_requires_mailbox_verification_and_works_for_multiple_admins(client, db_session, owner, monkeypatch):
+    key = 'private-reusable-owner-link-32-bytes-minimum'
+    monkeypatch.setattr(settings, 'ADMIN_JOIN_LINK_HASH', hashlib.sha256(key.encode()).hexdigest())
+    for address in ['first@example.com', 'second@example.com']:
+        from app.core.http_security import SecurityMiddleware
+        SecurityMiddleware._events.clear()
+        assert client.post('/api/v1/admin/join',json={'email':address,'join_key':'wrong-key-long-enough-for-validation'}).status_code == 403
+        assert client.post('/api/v1/admin/join',json={'email':address,'join_key':key}).status_code == 202
+        # Possession of the reusable link alone cannot bypass verification.
+        assert client.post('/api/v1/admin/register',json={'email':address,'password':PASSWORD,'secret_key':key}).status_code == 403
+        assert not db_session.query(AdminUser).filter_by(email=address).first()
+        row=db_session.query(EmailDelivery).filter(EmailDelivery.event_key.like('admin-join:%'),EmailDelivery.recipient==address).one()
+        token=re.search(r'invite=([^&]+)',row.html).group(1)
+        assert client.post('/api/v1/admin/register',json={'email':'wrong@example.com','password':PASSWORD,'secret_key':token}).status_code == 403
+        assert client.post('/api/v1/admin/register',json={'email':address,'password':PASSWORD,'secret_key':token}).status_code == 201
+        assert client.post('/api/v1/admin/register',json={'email':address,'password':PASSWORD,'secret_key':token}).status_code == 403
+    assert len(admin_recipients(db_session)) == 3
+
+
+def test_join_link_can_be_disabled_rotated_and_does_not_reactivate_users(client, db_session, owner, monkeypatch):
+    key='private-reusable-owner-link-32-bytes-minimum'
+    monkeypatch.setattr(settings,'ADMIN_JOIN_LINK_HASH','')
+    body={'email':'future@example.com','join_key':key}
+    assert client.post('/api/v1/admin/join',json=body).status_code == 403
+    monkeypatch.setattr(settings,'ADMIN_JOIN_LINK_HASH',hashlib.sha256(b'a-rotated-private-owner-link').hexdigest())
+    assert client.post('/api/v1/admin/join',json=body).status_code == 403
+    monkeypatch.setattr(settings,'ADMIN_JOIN_LINK_HASH',hashlib.sha256(key.encode()).hexdigest())
+    admin,_=owner
+    admin.is_active=False;db_session.commit()
+    body['email']=admin.email
+    assert client.post('/api/v1/admin/join',json=body).status_code == 202
+    db_session.refresh(admin)
+    assert not admin.is_active and db_session.query(AdminInvitation).count() == 0
+
+
+def test_join_repeated_request_does_not_duplicate_email_queue(client, db_session, owner, monkeypatch):
+    key='private-reusable-owner-link-32-bytes-minimum'
+    monkeypatch.setattr(settings,'ADMIN_JOIN_LINK_HASH',hashlib.sha256(key.encode()).hexdigest())
+    body={'email':'new@example.com','join_key':key}
+    assert client.post('/api/v1/admin/join',json=body).status_code == 202
+    assert client.post('/api/v1/admin/join',json=body).status_code == 202
+    assert db_session.query(EmailDelivery).filter(EmailDelivery.event_key.like('admin-join:%')).count() == 1
+
+
 def test_admin_recovery_is_private_single_use_and_revokes_sessions(client, db_session, owner):
     admin,headers=owner
     actual=client.post('/api/v1/admin/forgot-password',json={'email':admin.email})
