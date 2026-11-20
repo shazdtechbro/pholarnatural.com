@@ -18,6 +18,7 @@ import {
   ExternalLink,
 } from 'lucide-react'
 import { useAdminAuth } from '@/context/AdminAuthContext'
+import styles from './AdminShell.module.css'
 
 const NAV = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
@@ -35,6 +36,18 @@ export default function AdminShell({ children }: { children: ReactNode }) {
   const router = useRouter()
   const { authenticated, ready, signOut } = useAdminAuth()
   const [open, setOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
+
+  useEffect(() => {
+    const close = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false)
+        setCollapsed(true)
+      }
+    }
+    window.addEventListener('keydown', close)
+    return () => window.removeEventListener('keydown', close)
+  }, [])
 
   const isPublicPage = pathname === '/admin/login' || pathname === '/admin/register' || pathname === '/admin/forgot-password' || pathname === '/admin/reset-password'
 
@@ -61,17 +74,35 @@ export default function AdminShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-surface-container-low">
+    <div className={`${styles.shell} bg-surface-container-low`} data-collapsed={collapsed}>
+      <header className={`${styles.header} flex items-center gap-3 border-b border-outline-variant bg-surface-container-lowest px-4 py-3`}>
+        <button
+          type="button"
+          onClick={() => {
+            if (window.matchMedia('(min-width: 1024px)').matches) setCollapsed((value) => !value)
+            else setOpen((value) => !value)
+          }}
+          aria-controls="admin-navigation"
+          aria-label="Toggle admin menu"
+          className="rounded-full p-3 text-primary hover:bg-surface-container-high"
+        >
+          <Menu className="h-5 w-5" aria-hidden="true" />
+        </button>
+        <span className="font-headline-md text-body-lg font-bold text-primary">Admin</span>
+      </header>
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 shrink-0 border-r border-outline-variant bg-surface-container-lowest transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${
-          open ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        id="admin-navigation"
+        data-open={open}
+        className={`${styles.sidebar} border-r border-outline-variant bg-surface-container-lowest`}
       >
         <div className="flex h-full flex-col">
           <div className="flex items-center gap-2 border-b border-outline-variant p-5">
             <Image src="/logo.svg" alt="" width={32} height={32} className="h-8 w-8" />
             <span className="font-headline-md text-body-lg font-bold text-primary">Admin</span>
+            <button type="button" aria-label="Close admin menu" onClick={() => { setOpen(false); setCollapsed(true) }} className="ml-auto rounded-full p-3 text-primary hover:bg-surface-container-high">
+              <X className="h-5 w-5" aria-hidden="true" />
+            </button>
           </div>
 
           <nav aria-label="Admin" className="flex-1 overflow-y-auto p-3">
@@ -82,6 +113,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
                   <li key={href}>
                     <Link
                       href={href}
+                      onClick={() => setOpen(false)}
                       aria-current={active ? 'page' : undefined}
                       className={`flex items-center gap-3 rounded-xl px-4 py-3 font-body-md text-body-md transition-colors ${
                         active
@@ -121,29 +153,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      {open && (
-        <button
-          type="button"
-          aria-label="Close menu"
-          onClick={() => setOpen(false)}
-          className="fixed inset-0 z-30 bg-inverse-surface/40 lg:hidden"
-        />
-      )}
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-3 border-b border-outline-variant bg-surface-container-lowest px-4 py-3 lg:hidden">
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            aria-expanded={open}
-            aria-label={open ? 'Close menu' : 'Open menu'}
-            className="rounded-full p-2 text-primary hover:bg-surface-container-high"
-          >
-            {open ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
-          </button>
-          <span className="font-headline-md text-body-lg font-bold text-primary">Admin</span>
-        </header>
-
+      <div className={`${styles.content} flex min-w-0 flex-col`}>
         <main id="admin-main" className="min-w-0 flex-1 p-4 md:p-8">
           {children}
         </main>
@@ -151,3 +161,4 @@ export default function AdminShell({ children }: { children: ReactNode }) {
     </div>
   )
 }
+
