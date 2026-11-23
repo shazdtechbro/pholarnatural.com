@@ -13,7 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from app.api.dependencies import get_db, get_current_admin
 from app.core.config import settings
 from app.models.subscriber import Subscriber
-from app.services.email import queue_email
+from app.services.email import queue_email, message
 from app.services.newsletter_mail import _base
 def send_email(to, subject, html, *, db, event_key):
     return queue_email(db, event_key, to, subject, html)
@@ -62,7 +62,7 @@ def subscribe(body: Signup, request: Request, db: Session = Depends(get_db)):
     try:
         db.flush()
         link = BASE+"/confirm?token="+token_for(sub, "confirm")
-        html = _base("Confirm your newsletter subscription", f'<h1>Join the Natural Ritual</h1><p>Please confirm you would like to receive Pholar Natural product news and hair wellness updates.</p><p><a href="{escape(link, quote=True)}">Confirm subscription</a></p><p>This link expires in 48 hours. If you did not request this, ignore this email; you will not be subscribed.</p>')
+        _, html = message("Join the Natural Ritual", ["Please confirm you would like to receive Pholar Natural product news and hair wellness updates.", "This link expires in 48 hours. If you did not request this, ignore this email; you will not be subscribed."], action_url=link, action_label="Confirm subscription")
         send_email(sub.email, "Confirm your Pholar Natural newsletter subscription", html, db=db, event_key=f"newsletter/{sub.nonce}/confirm")
         db.commit()
     except IntegrityError:

@@ -220,7 +220,7 @@ def request_admin_join(body: AdminJoinRequest, db: Session = Depends(get_db)):
     from urllib.parse import urlencode
     from sqlalchemy import func
     from app.models.admin import AdminInvitation
-    from app.services.email import queue_email, message, e
+    from app.services.email import queue_email, message
     from app.core.transactions import transaction_lock
 
     digest = hashlib.sha256(body.join_key.encode()).hexdigest()
@@ -247,8 +247,8 @@ def request_admin_join(body: AdminJoinRequest, db: Session = Depends(get_db)):
         "You requested administrator access using the private Pholar Natural join link.",
         "Open the link below to verify this email and choose your password. The account has full dashboard access. This email link expires in 48 hours and works once.",
         "If you did not request access, ignore this email. No account has been created.",
-    ])
-    queue_email(db, "admin-join:"+str(invitation.id), address, title, html.replace("</body>", '<p><a href="'+e(url)+'">Verify email and create my admin account</a></p></body>'))
+    ], action_url=url, action_label="Verify email and create my admin account")
+    queue_email(db, "admin-join:"+str(invitation.id), address, title, html)
     db.commit()
     return result
 
@@ -265,7 +265,7 @@ def invite_admin(body: InvitationCreate, db: Session = Depends(get_db), current_
     from urllib.parse import urlencode
     from sqlalchemy import func
     from app.models.admin import AdminInvitation
-    from app.services.email import queue_email, message, e
+    from app.services.email import queue_email, message
     from app.core.transactions import transaction_lock
     if not security.verify_password(body.current_password, current_admin.hashed_password):
         raise HTTPException(403, "Current password is incorrect.")
@@ -278,8 +278,8 @@ def invite_admin(body: InvitationCreate, db: Session = Depends(get_db), current_
     invitation = AdminInvitation(email=address, token_hash=hashlib.sha256(token.encode()).hexdigest(), expires_at=datetime.now(timezone.utc)+timedelta(hours=48))
     db.add(invitation); db.flush()
     url = settings.DOMAIN+"/admin/register#"+urlencode({"invite": token, "email": address})
-    title, html = message("Your Pholar Natural admin invitation", ["An administrator invited you to manage Pholar Natural. This grants full dashboard access. Choose your own password using the invitation link. The link expires in 48 hours and works once. If this was unexpected, ignore it."])
-    queue_email(db, "admin-invite:"+str(invitation.id), address, title, html.replace("</body>", '<p><a href="'+e(url)+'">Create my administrator account</a></p></body>'))
+    title, html = message("Your Pholar Natural admin invitation", ["An administrator invited you to manage Pholar Natural. This grants full dashboard access. Choose your own password using the invitation link. The link expires in 48 hours and works once. If this was unexpected, ignore it."], action_url=url, action_label="Create my administrator account")
+    queue_email(db, "admin-invite:"+str(invitation.id), address, title, html)
     db.commit()
     return {"queued": True, "expires_in_hours": 48}
 
@@ -321,7 +321,7 @@ def admin_forgot_password(body: AdminRecoveryRequest, db: Session = Depends(get_
     from datetime import datetime, timezone
     from urllib.parse import urlencode
     from app.models.admin import AdminInvitation
-    from app.services.email import queue_email, message, e
+    from app.services.email import queue_email, message
     from app.core.transactions import transaction_lock
     transaction_lock(db, 901)
     admin = db.query(AdminUser).filter_by(email=str(body.email).lower(), is_active=True).first()
@@ -331,8 +331,8 @@ def admin_forgot_password(body: AdminRecoveryRequest, db: Session = Depends(get_
         action = AdminInvitation(email=admin.email, purpose="password_reset", token_hash=hashlib.sha256(token.encode()).hexdigest(), expires_at=datetime.now(timezone.utc)+timedelta(minutes=30))
         db.add(action); db.flush()
         url = settings.DOMAIN+"/admin/reset-password#"+urlencode({"token": token})
-        title, html = message("Reset your Pholar Natural admin password", ["Use this single-use link within 30 minutes to choose a new password. If you did not request a reset, ignore this email. No password has changed."])
-        queue_email(db, "admin-reset:"+str(action.id), admin.email, title, html.replace("</body>", '<p><a href="'+e(url)+'">Reset my password</a></p></body>'))
+        title, html = message("Reset your Pholar Natural admin password", ["Use this single-use link within 30 minutes to choose a new password. If you did not request a reset, ignore this email. No password has changed."], action_url=url, action_label="Reset my password")
+        queue_email(db, "admin-reset:"+str(action.id), admin.email, title, html)
         db.commit()
     return {"message": "If this is an active admin account, a password reset email will arrive shortly."}
 

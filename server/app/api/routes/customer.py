@@ -2,7 +2,6 @@
 import hashlib
 import secrets
 from datetime import timedelta, timezone
-from html import escape
 from uuid import UUID
 
 from argon2 import PasswordHasher
@@ -20,8 +19,7 @@ from app.models.order import Order
 from app.models.booking import Booking
 from app.models.product import ProductVariant
 from app.services.mail_delivery import utcnow
-from app.services.email import queue_email
-from app.services.newsletter_mail import _base
+from app.services.email import queue_email, message
 
 router = APIRouter()
 hasher = PasswordHasher(time_cost=2, memory_cost=19456, parallelism=1)
@@ -81,8 +79,8 @@ def send_action(db, customer, purpose):
     title = "Verify your email" if purpose == "verify" else "Reset your password"
     path = "verify" if purpose == "verify" else "reset-password"
     link = f"{settings.DOMAIN.rstrip('/')}/account/{path}#token={token}"
-    note = "Enter the password you chose when creating your account. This protects your bookings and orders." if purpose == "verify" else "Choose a new password. This link expires in 30 minutes and can only be used once."
-    html = _base(title, f'<h1>{title}</h1><p>Hello {escape(customer.name)},</p><p>{note}</p><p><a href="{escape(link, quote=True)}">{title}</a></p><p>If you did not request this, you can ignore this email.</p>')
+    note = "Enter the password you chose when creating your account. This protects your bookings and orders. This verification link expires in 24 hours and can only be used once." if purpose == "verify" else "Choose a new password. This link expires in 30 minutes and can only be used once."
+    _, html = message(title, [f"Hello {customer.name},", note, "If you did not request this, you can ignore this email."], action_url=link, action_label=title)
     queue_email(db, f"account/{row.token_hash}/{purpose}", customer.email, f"{title} · Pholar Natural", html)
 
 
@@ -205,7 +203,8 @@ def reset(body: ResetInput, db: Session = Depends(get_db)):
     customer.verified = True
     db.query(CustomerAction).filter_by(customer_id=customer.id).update({"used": True})
     db.query(CustomerSession).filter_by(customer_id=customer.id).delete()
-    queue_email(db, f"account/{row.token_hash}/password-changed", customer.email, "Your Pholar Natural password was changed", _base("Password changed", '<h1>Your password was changed</h1><p>All previous sessions have been signed out. If this was not you, reset your password immediately and contact us.</p>'))
+    _, html = message("Your password was changed", ["All previous sessions have been signed out. If this was not you, reset your password immediately and contact us."])
+    queue_email(db, f"account/{row.token_hash}/password-changed", customer.email, "Your Pholar Natural password was changed", html)
     db.commit()
     return {"message": "Password updated. Sign in with your new password."}
 

@@ -17,6 +17,7 @@ from app.core.config import settings
 from app.db.database import SessionLocal
 from app.models.notification import EmailDelivery
 from app.services.settings_service import get_setting
+from app.services.email_design import frame, heading, paragraph, action, reference, details
 
 logger = logging.getLogger(__name__)
 
@@ -29,19 +30,11 @@ def cad(value, currency="CAD"):
     return f"{currency} ${value / 100:,.2f}"
 
 
-def message(title, lines):
-    return (
-        title,
-        '<!doctype html><html><body style="font-family:Arial,sans-serif;color:#334537">'
-        "<h1>Pholar Natural</h1><h2>"
-        + e(title)
-        + "</h2>"
-        + "".join("<p>" + e(line) + "</p>" for line in lines)
-        + "<p>Questions? Reply to your Pholar Natural contact or visit "
-        '<a href="'
-        + e(settings.DOMAIN.rstrip("/") + "/contact")
-        + '">Contact us</a>.</p></body></html>',
-    )
+def message(title, lines, *, action_url=None, action_label=None):
+    content = heading(title) + ''.join(paragraph(line) for line in lines)
+    if action_url and action_label:
+        content += action(action_url, action_label)
+    return title, frame(title, content)
 
 
 def queue_email(db, key, recipient, subject, html):
@@ -100,17 +93,21 @@ def queue_admin(db, key, content, force=False):
 
 def order_confirmation_email(order):
     address = order.shipping_address or {}
-    lines = [
-        f"Order PN-{str(order.id)[:8].upper()} is paid.",
-        *[
-            f"{i.product_name} ({i.variant_label or 'Standard'}) × {i.quantity}: {cad(i.unit_price_cents * i.quantity, order.currency)}"
-            for i in order.items
-        ],
-        f"Subtotal: {cad(order.subtotal_cents, order.currency)}; discount: {cad(order.discount_cents, order.currency)}; shipping: {cad(order.shipping_cents, order.currency)}; tax: {cad(order.tax_cents, order.currency)}; total: {cad(order.total_cents, order.currency)}",
-        "Shipping to: " + ", ".join(str(v) for v in address.values() if v),
-        "We will email you as your order progresses.",
-    ]
-    return message("Order payment confirmed", lines)
+    from app.core.security import customer_token
+    title = "Order payment confirmed"
+    url = settings.DOMAIN.rstrip('/') + '/order-confirmation?id=' + str(order.id) + '&token=' + customer_token('order', order.id)
+    content = heading(title) + paragraph("Thank you. Your payment is confirmed and we are getting your order ready.")
+    content += reference(f"PN-{str(order.id)[:8].upper()}", "Order reference")
+    content += details([(f"{i.product_name} · {i.variant_label or 'Standard'} × {i.quantity}", cad(i.unit_price_cents * i.quantity, order.currency)) for i in order.items])
+    content += details([
+        ("Subtotal", cad(order.subtotal_cents, order.currency)),
+        ("Discount", '−' + cad(order.discount_cents, order.currency)),
+        ("Shipping", cad(order.shipping_cents, order.currency)),
+        ("Tax", cad(order.tax_cents, order.currency)),
+    ], total=("Total paid", cad(order.total_cents, order.currency)))
+    content += paragraph("Shipping to: " + ", ".join(str(v) for v in address.values() if v))
+    content += paragraph("We will email you as your order progresses.") + action(url, "View your order")
+    return title, frame(title, content)
 
 
 def booking_confirmation_email(booking):
@@ -123,19 +120,18 @@ def booking_confirmation_email(booking):
         + "&token="
         + customer_token("booking", booking.id)
     )
-    title, html = message(
-        "Appointment confirmed",
-        [
-            f"Reference PN-{str(booking.id)[:8].upper()}",
-            f"{booking.service.name}: {booking.booking_date} at {booking.start_time}–{booking.end_time}",
-            f"Deposit paid: {cad(booking.deposit_cents, booking.currency)}",
-            "Cancel within 30 minutes of booking for a full deposit refund. Later cancellations are subject to the refund policy.",
-        ],
-    )
-    return title, html.replace(
-        "</body>",
-        '<p><a href="' + e(url) + '">View or cancel your appointment</a></p></body>',
-    )
+    title = "Appointment confirmed"
+    content = heading(title) + paragraph("Your time for a little crown care is booked. We look forward to seeing you.")
+    content += reference(f"PN-{str(booking.id)[:8].upper()}", "Booking reference")
+    content += details([
+        ("Service", booking.service.name),
+        ("Date", str(booking.booking_date)),
+        ("Time", f"{booking.start_time}–{booking.end_time}"),
+        ("Timezone", settings.BUSINESS_TIMEZONE),
+    ], total=("Deposit paid", cad(booking.deposit_cents, booking.currency)))
+    content += paragraph("Cancel within 30 minutes of booking for a full deposit refund. Later cancellations are subject to the refund policy.")
+    content += action(url, "View or cancel your appointment")
+    return title, frame(title, content)
 
 
 def order_status_update_email(order, status):
