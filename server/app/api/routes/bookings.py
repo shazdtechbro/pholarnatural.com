@@ -23,6 +23,18 @@ from app.services.whatsapp import notify, NotificationEvent
 router = APIRouter()
 
 
+@router.post("/{booking_id}/balance-checkout")
+def pay_remaining_balance(
+    booking_id: UUID,
+    x_confirmation_token: str = Header(...),
+    db: Session = Depends(get_db),
+):
+    from app.core.security import verify_customer_token
+    from app.services.booking_balance import checkout
+    verify_customer_token(x_confirmation_token, "booking", booking_id)
+    return checkout(db, booking_id)
+
+
 @router.get("/blocked-dates", response_model=List[BlockedDateResponse])
 def list_blocked_dates(db: Session = Depends(get_db)):
     """Get all dates that are blocked from booking."""
@@ -142,10 +154,12 @@ def booking_confirmation(
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
     if not booking:
         raise HTTPException(404, "Booking not found.")
+    from app.services.booking_balance import summary
     return {
+        **summary(booking),
         "id": str(booking.id),
         "reference": f"PN-{str(booking.id)[:8].upper()}",
-        "service_name": booking.service.name,
+        "service_name": booking.service_name_snapshot or booking.service.name,
         "service_id": str(booking.service_id),
         "customer_name": booking.customer_name,
         "customer_email": booking.customer_email,

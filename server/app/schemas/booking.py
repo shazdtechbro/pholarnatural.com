@@ -82,6 +82,10 @@ class BookingCancelRequest(BaseModel):
     cancellation_reason: Optional[str] = Field(default=None, max_length=255)
 
 
+class BookingBalanceRequest(InputModel):
+    original_total_cents: int | None = Field(default=None, ge=50, le=10000000, strict=True)
+
+
 class BookingDepositResponse(BaseModel):
     """Phase 9: Payment Intent created — mount Payment Element using client_secret."""
 
@@ -110,6 +114,13 @@ class BookingCancelResponse(BaseModel):
 
 
 class AdminBookingResponse(BaseModel):
+    total_price_cents: int | None = None
+    deposit_paid_cents: int = 0
+    balance_paid_cents: int = 0
+    balance_due_cents: int | None = None
+    balance_status: str = "not_requested"
+    service_completed_at: datetime | None = None
+    balance_requested_at: datetime | None = None
     payment_environment: str = "legacy"
     payment_provider: str = "stripe"
     id: UUID
@@ -135,10 +146,12 @@ class AdminBookingResponse(BaseModel):
         if isinstance(data, dict):
             return data
         svc = getattr(data, "service", None)
+        from app.services.booking_balance import summary
         return {
+            **summary(data),
             "id": data.id,
             "service_id": data.service_id,
-            "service_name": svc.name if svc else "—",
+            "service_name": data.service_name_snapshot or (svc.name if svc else "—"),
             "customer_name": data.customer_name,
             "customer_email": data.customer_email,
             "customer_phone": getattr(data, "customer_phone", None),

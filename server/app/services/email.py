@@ -124,11 +124,14 @@ def booking_confirmation_email(booking):
     content = heading(title) + paragraph("Your time for a little crown care is booked. We look forward to seeing you.")
     content += reference(f"PN-{str(booking.id)[:8].upper()}", "Booking reference")
     content += details([
-        ("Service", booking.service.name),
+        ("Service", getattr(booking, 'service_name_snapshot', None) or booking.service.name),
         ("Date", str(booking.booking_date)),
         ("Time", f"{booking.start_time}–{booking.end_time}"),
         ("Timezone", settings.BUSINESS_TIMEZONE),
     ], total=("Deposit paid", cad(booking.deposit_cents, booking.currency)))
+    if getattr(booking, 'total_price_cents', None) is not None:
+        content += details([('Original service price', cad(booking.total_price_cents, booking.currency)), ('Remaining after deposit', cad(booking.total_price_cents - booking.deposit_cents, booking.currency))])
+        content += paragraph('After your service, the studio will send a secure link to pay the remaining balance. Your original service price is saved with this booking.')
     content += paragraph("Cancel within 30 minutes of booking for a full deposit refund. Later cancellations are subject to the refund policy.")
     content += action(url, "View or cancel your appointment")
     return title, frame(title, content)

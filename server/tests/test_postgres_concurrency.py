@@ -10,7 +10,7 @@ from sqlalchemy.engine import make_url
 from app.models.product import Product, ProductVariant
 from app.models.service import Service
 from app.models.order import Order
-from app.models.booking import Booking
+from app.models.booking import Booking, BookingBalancePayment
 from app.schemas.order import OrderCreate
 from app.schemas.booking import BookingCreate
 from app.services.order_service import create_order_checkout
@@ -154,3 +154,47 @@ def test_customer_reset_link_can_only_be_used_by_one_worker(postgres):
     with ThreadPoolExecutor(max_workers=2) as pool:
         results = list(pool.map(use, range(2)))
     assert sorted(results) == [200, 400]
+
+
+def test_balance_request_and_checkout_are_safe_across_workers(postgres, monkeypatch):
+    from threading import Lock
+    from datetime import timedelta, time
+    from app.core.config import settings
+    from app.services.booking_balance import request_balance, checkout
+    from app.services.bachs_gateway import BachsGateway
+    from app.services.mail_delivery import utcnow
+    from app.models.notification import EmailDelivery
+    monkeypatch.setattr(settings, 'PAYMENT_PROVIDER', 'bachs')
+    monkeypatch.setattr(settings, 'BACHS_ENVIRONMENT', 'sandbox')
+    booking_id, service_id = uuid.uuid4(), uuid.uuid4()
+    with postgres() as db:
+        db.add(Service(id=service_id, name='Balance test', slug='balance-'+str(service_id), price_cents=9999, duration_minutes=60, is_active=True))
+        db.flush()
+        db.add(Booking(id=booking_id, service_id=service_id, customer_name='Balance test', customer_email='balance@example.com', booking_date=utcnow().date()-timedelta(days=1), start_time=time(10), end_time=time(11), status='confirmed', deposit_cents=1000, total_price_cents=9999, currency='USD', payment_provider='bachs', payment_environment='sandbox', payment_charge_id='ch_'+uuid.uuid4().hex))
+        db.commit()
+    def release(_):
+        with postgres() as db:
+            return str(request_balance(db, booking_id).id)
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        assert len(set(pool.map(release, range(3)))) == 1
+    lock, sessions = Lock(), {}
+    class Gateway:
+        environment = 'sandbox'
+        checkout_payload = BachsGateway.checkout_payload
+        def checkout(self, *args, frozen_body=None, **kwargs):
+            with lock:
+                key = frozen_body['reference']
+                sessions.setdefault(key, {'session_id':'chk_'+key, 'url':'https://sandbox-checkout.bachs.io/c/'+key})
+                return sessions[key]
+        def request(self, method, path):
+            return {'checkout_id':path.rsplit('/',1)[-1], 'status':'open', 'payment_status':'requires_payment_method'}
+    gateway = Gateway()
+    def pay(_):
+        with postgres() as db:
+            return checkout(db, booking_id, gateway)['checkout_url']
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        assert len(set(pool.map(pay, range(3)))) == 1
+    with postgres() as db:
+        assert db.query(BookingBalancePayment).filter_by(booking_id=booking_id).count() == 1
+        assert db.query(EmailDelivery).filter_by(event_key=f'booking:{booking_id}:balance_requested').count() == 1
+    assert len(sessions) == 1

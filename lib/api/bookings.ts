@@ -100,7 +100,18 @@ export async function cancelBooking(
 export type BookingConfirmation = Omit<import('@/lib/types').Booking, 'status'> & {
   service_name: string
   status: string
+  total_price_cents: number | null
+  deposit_paid_cents: number
+  balance_paid_cents: number
+  balance_due_cents: number | null
+  balance_status: string
+  service_completed_at: string | null
+  balance_requested_at: string | null
 }
+export const payBookingBalance = (id: string, token: string) =>
+  apiClient<{checkout_url: string | null; fully_paid: boolean}>(`/api/v1/bookings/${encodeURIComponent(id)}/balance-checkout`, {
+    method: 'POST', headers: {'X-Confirmation-Token': token},
+  })
 export const getBookingConfirmation = (id: string, token: string) =>
   apiClient<BookingConfirmation>(`/api/v1/bookings/${encodeURIComponent(id)}`, {
     headers: { 'X-Confirmation-Token': token },

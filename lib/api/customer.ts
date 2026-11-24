@@ -4,7 +4,7 @@ export interface Customer { id: string; name: string; email: string; verified: b
 export interface SavedCart { items: CartItem[]; version: number }
 export interface AccountHistory {
   orders: { id: string; reference: string; date: string; status: string; currency?: string; total_cents: number; url: string }[]
-  bookings: { id: string; service: string; date: string; time: string; status: string; deposit_cents: number; url: string }[]
+  bookings: { id: string; service: string; date: string; time: string; status: string; deposit_cents: number; currency?: string; balance_due_cents?: number | null; balance_status?: string; url: string }[]
 }
 export class AccountError extends Error {
   constructor(public status: number, message: string) { super(message) }

@@ -10,12 +10,24 @@ from app.models.admin import AdminUser
 from app.schemas.booking import (
     AdminBookingResponse,
     BookingCancelRequest,
+    BookingBalanceRequest,
     BlockedDateCreate,
     BlockedDateResponse,
 )
 from app.services import booking_service
 
 router = APIRouter()
+
+
+@router.post("/{booking_id}/request-balance", response_model=AdminBookingResponse)
+def request_remaining_payment(
+    booking_id: UUID,
+    body: BookingBalanceRequest,
+    db: Session = Depends(get_db),
+    current_admin: AdminUser = Depends(get_current_admin),
+):
+    from app.services.booking_balance import request_balance
+    return request_balance(db, booking_id, body.original_total_cents)
 
 # ---- BOOKINGS ----
 

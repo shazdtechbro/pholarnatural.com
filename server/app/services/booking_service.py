@@ -137,7 +137,8 @@ def create_booking_with_payment_intent(db, booking_in, payment_gateway, request_
             400, "Service deposit is below the supported payment minimum."
         )
     booking = Booking(
-        **booking_in.model_dump(), end_time=end, status="pending", deposit_cents=deposit
+        **booking_in.model_dump(), end_time=end, status="pending", deposit_cents=deposit,
+        total_price_cents=svc.price_cents, service_name_snapshot=svc.name
     )
     initialize(booking, key, fingerprint)
     db.add(booking)

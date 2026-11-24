@@ -26,6 +26,7 @@ import { useToast } from '@/context/ToastContext'
 import {
   listAdminBookings,
   cancelBookingAdmin,
+  requestBookingBalance,
   listAdminBlockedDates,
   blockDate,
   unblockDate,
@@ -61,6 +62,7 @@ export default function AdminBookingsPage() {
   const [period, setPeriod] = useState<'month' | 'week' | 'day'>('month')
   const [filter, setFilter] = useState<Filter>('all')
   const [cancelling, setCancelling] = useState<AdminBooking | null>(null)
+  const [requestingBalance, setRequestingBalance] = useState<AdminBooking | null>(null)
   const [blockingOpen, setBlockingOpen] = useState(false)
   const { toast } = useToast()
 
@@ -386,6 +388,7 @@ export default function AdminBookingsPage() {
                   <Th>Service</Th>
                   <Th>When</Th>
                   <Th>Deposit</Th>
+                  <Th>Remaining payment</Th>
                   <Th>Status</Th>
                   <Th className="text-right">Actions</Th>
                 </tr>
@@ -410,6 +413,10 @@ export default function AdminBookingsPage() {
                     </Td>
                     <Td>{formatPrice(b.deposit_cents, b.currency)}</Td>
                     <Td>
+                      <span className="block font-semibold">{b.balance_due_cents == null ? 'Original price needed' : formatPrice(b.balance_due_cents, b.currency)}</span>
+                      <span className="block text-[12px]">{b.balance_status === 'paid' ? 'Fully paid' : b.balance_status === 'review_required' ? 'Needs review' : b.balance_requested_at ? 'Payment requested' : 'Due after service'}</span>
+                    </Td>
+                    <Td>
                       <StatusBadge status={b.status} />
                       {b.cancellation_reason && (
                         <span className="mt-1 block text-[11px] text-on-surface-variant">
@@ -419,6 +426,7 @@ export default function AdminBookingsPage() {
                     </Td>
                     <Td>
                       <div className="flex justify-end gap-2">
+                        {b.status === 'confirmed' && !b.balance_requested_at && <button type="button" onClick={() => setRequestingBalance(b)} className="rounded-full border border-primary px-3 py-2 text-[12px] font-semibold text-primary">Complete service &amp; request balance</button>}
                         {b.status === 'pending' && (
                           <span className="text-[12px]">Awaiting deposit</span>
                         )}
@@ -452,12 +460,33 @@ export default function AdminBookingsPage() {
           }}
         />
       )}
+      {requestingBalance && <BalanceDialog booking={requestingBalance} onClose={() => setRequestingBalance(null)} onSaved={(updated) => { setBookings((rows) => rows.map((row) => row.id === updated.id ? updated : row)); setRequestingBalance(null); toast('Service completed. Remaining-payment email queued.') }} />}
 
       {blockingOpen && (
         <BlockDateDialog onClose={() => setBlockingOpen(false)} onConfirm={handleBlockDate} />
       )}
     </>
   )
+}
+
+function BalanceDialog({ booking, onClose, onSaved }: { booking: AdminBooking; onClose: () => void; onSaved: (booking: AdminBooking) => void }) {
+  const [originalPrice, setOriginalPrice] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const priceMatch = /^(\d+)(?:\.(\d{1,2}))?$/.exec(originalPrice.trim())
+  const enteredCents = priceMatch ? Number(priceMatch[1]) * 100 + Number((priceMatch[2] ?? '').padEnd(2, '0')) : null
+  const total = booking.total_price_cents ?? enteredCents
+  const deposit = booking.deposit_paid_cents ?? booking.deposit_cents
+  const due = total == null ? null : Math.max(0, total - deposit - (booking.balance_paid_cents ?? 0))
+  return <Modal open onClose={() => { if (!busy) onClose() }} title="Complete service & request payment">
+    <p className="mb-5 text-sm leading-7">Confirm that you have rendered {booking.service_name} for {booking.customer_name}. The customer receives a secure payment link and can also pay from their booking page.</p>
+    <form onSubmit={async (event) => { event.preventDefault(); setError(''); if (booking.total_price_cents == null && (enteredCents == null || !Number.isSafeInteger(enteredCents) || enteredCents > 10000000)) { setError('Enter the original agreed price with at most two decimal places.'); return } setBusy(true); try { onSaved(await requestBookingBalance(booking.id, booking.total_price_cents == null ? enteredCents! : undefined)) } catch (err) { setError(err instanceof Error ? err.message : 'Could not request payment. Please retry.')} finally {setBusy(false)} }}>
+      {booking.total_price_cents == null && <Field required label={`Original agreed service price (${booking.currency ?? 'USD'})`} inputMode="decimal" value={originalPrice} onChange={(event) => setOriginalPrice(event.target.value)} hint="This older booking has no saved price. Check the original agreement; do not use today’s service price. This amount will be locked." />}
+      <dl className="my-5 space-y-3 rounded-xl bg-surface-container-low p-5 text-sm"><div className="flex justify-between gap-3"><dt>Original price</dt><dd>{total == null ? 'Enter above' : formatPrice(total, booking.currency)}</dd></div><div className="flex justify-between gap-3"><dt>Deposit already paid</dt><dd>− {formatPrice(deposit, booking.currency)}</dd></div><div className="flex justify-between gap-3 border-t pt-3 font-semibold"><dt>Customer pays now</dt><dd>{due == null ? '—' : formatPrice(due, booking.currency)}</dd></div></dl>
+      {error && <p role="alert" className="mb-4 text-sm text-error">{error}</p>}
+      <div className="flex flex-wrap justify-end gap-3"><AdminButton type="button" variant="secondary" disabled={busy} onClick={onClose}>Go back</AdminButton><AdminButton type="submit" disabled={busy || due == null || due <= 0}>{busy ? 'Requesting…' : 'Service rendered — send payment request'}</AdminButton></div>
+    </form>
+  </Modal>
 }
 
 function CancelDialog({

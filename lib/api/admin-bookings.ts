@@ -1,6 +1,13 @@
 import { apiClient } from './client'
 
 export interface AdminBooking {
+  total_price_cents: number | null
+  deposit_paid_cents: number
+  balance_paid_cents: number
+  balance_due_cents: number | null
+  balance_status: string
+  service_completed_at: string | null
+  balance_requested_at: string | null
   payment_environment?: string
   payment_provider?: string
   id: string
@@ -18,6 +25,11 @@ export interface AdminBooking {
   cancellation_reason: string | null
   reference: string
 }
+
+export const requestBookingBalance = (id: string, originalTotalCents?: number) =>
+  apiClient<AdminBooking>(`/api/v1/admin/bookings/${id}/request-balance`, {
+    method: 'POST', auth: true, body: {original_total_cents: originalTotalCents ?? null},
+  })
 
 export interface AdminBlockedDate {
   id: string

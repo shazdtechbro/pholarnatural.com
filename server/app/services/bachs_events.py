@@ -5,7 +5,7 @@ from app.core.config import settings
 from app.core.transactions import transaction_lock
 from app.models.payment import PaymentEvent
 from app.models.order import Order
-from app.models.booking import Booking
+from app.models.booking import Booking, BookingBalancePayment
 from app.models.product import ProductVariant
 from app.services.bachs_gateway import BachsGateway, BachsError, cents, resource_id
 from app.services.mail_delivery import utcnow
@@ -16,7 +16,7 @@ from app.services.email import queue_email, queue_admin, message, queue_order_st
 def record_for(db, field, value):
     if not value:
         return None
-    for model in (Order, Booking):
+    for model in (Order, Booking, BookingBalancePayment):
         record = db.query(model).filter(getattr(model, field) == value, model.payment_provider == "bachs", model.payment_environment == settings.BACHS_ENVIRONMENT).populate_existing().first()
         if record:
             return record
@@ -36,7 +36,7 @@ def verify_collection(db, event, gateway):
     record = record_for(db, "payment_checkout_id", checkout_id)
     if not record:
         metadata = checkout.get("metadata") or {}
-        for model, key in ((Order, "order_id"), (Booking, "booking_id")):
+        for model, key in ((BookingBalancePayment, "balance_id"), (Order, "order_id"), (Booking, "booking_id")):
             try:
                 candidate = db.get(model, UUID(metadata.get(key, "")))
             except (ValueError, TypeError):
@@ -47,12 +47,15 @@ def verify_collection(db, event, gateway):
     if not record:
         alert(db, event, "Unmatched payment needs review", "The checkout has no matching application purchase. No fulfilment was attempted.")
         return None
-    amount = record.total_cents if isinstance(record, Order) else record.deposit_cents
-    kind = "order" if isinstance(record, Order) else "booking"
+    balance = isinstance(record, BookingBalancePayment)
+    amount = record.amount_cents if balance else record.total_cents if isinstance(record, Order) else record.deposit_cents
+    kind = "booking_balance" if balance else "order" if isinstance(record, Order) else "booking"
+    metadata_key = "balance_id" if balance else kind+"_id"
     if (checkout.get("checkout_id") != checkout_id or checkout.get("currency") != record.currency
             or cents(checkout.get("amount")) != amount
             or checkout.get("reference") != kind+"-"+str(record.id)
-            or (checkout.get("metadata") or {}).get(kind+"_id") != str(record.id)):
+            or (checkout.get("metadata") or {}).get(metadata_key) != str(record.id)
+            or (balance and ((checkout.get("metadata") or {}).get('booking_id') != str(record.booking_id) or (checkout.get("metadata") or {}).get('type') != 'booking_balance'))):
         raise BachsError("CHECKOUT_MISMATCH")
     charge_id = resource_id(data.get("charge_id"))
     payment = gateway.request("GET", "/v1/payments/"+charge_id)
@@ -80,7 +83,10 @@ def handle(db, event, gateway):
         record = verify_collection(db, event, gateway)
         if not record:
             return
-        if isinstance(record, Booking):
+        if isinstance(record, BookingBalancePayment):
+            from app.services.booking_balance import confirm
+            confirm(db, record)
+        elif isinstance(record, Booking):
             booking_service.confirm_booking_payment_intent(db, record.payment_charge_id, gateway, provider="bachs")
         else:
             try:
@@ -106,6 +112,24 @@ def handle(db, event, gateway):
             raise BachsError("REFUND_MISMATCH")
         record.payment_refund_id = refund_id
         state = refund.get("status")
+        if isinstance(record, BookingBalancePayment):
+            if state == 'success':
+                if record.refunded_cents:
+                    return
+                payment = gateway.request('GET', '/v1/payments/' + resource_id(charge_id))
+                full = payment.get('status') in ('refunded', 'auto_refunded')
+                record.refunded_cents = record.amount_cents if full else min(record.amount_cents, cents(refund.get('refunded_amount', '0.00')))
+                record.status = 'refunded' if full else 'needs_review'
+                content = message('Service balance refund completed', [f'PN-{str(record.booking_id)[:8].upper()}', 'Your refund was sent to the original payment method. Your bank or payment provider determines when it appears.'])
+                queue_email(db, 'bachs-refund:'+refund_id, record.booking.customer_email, *content)
+                queue_admin(db, 'bachs-refund:'+refund_id, content)
+            elif state == 'failed':
+                record.status = 'paid' if record.paid_at else 'needs_review'
+                alert(db, event, 'Service balance refund failed', 'Review the refund in Bachs.')
+            else:
+                record.status = 'refund_pending'
+            db.commit()
+            return
         if state == "success":
             # One successful refund per payment. Duplicate deliveries cannot restock twice.
             payment = gateway.request("GET", "/v1/payments/"+resource_id(charge_id))
@@ -139,6 +163,17 @@ def handle(db, event, gateway):
         if record and record.status == "pending":
             checkout = gateway.request("GET", "/v1/checkout-sessions/"+resource_id(record.payment_checkout_id))
             if checkout.get("payment_status") == "succeeded":
+                return
+            if isinstance(record, BookingBalancePayment):
+                if event.kind == 'checkout.expired' and checkout.get('status') == 'expired':
+                    record.status = 'expired'
+                from app.services.booking_balance import customer_url
+                content = message('Remaining service payment not completed', ['Your deposit is still recorded. The remaining payment has not been confirmed. Return to your booking to retry securely.'], action_url=customer_url(record.booking), action_label='View remaining payment')
+                queue_email(db, f'booking:{record.booking_id}:balance_failed:{record.id}', record.booking.customer_email, *content)
+                queue_admin(db, f'booking:{record.booking_id}:balance_failed:{record.id}', content)
+                from app.services.whatsapp import notify, NotificationEvent
+                notify(NotificationEvent.PAYMENT_FAILED, f'Remaining service payment not completed: PN-{str(record.booking_id)[:8].upper()}.', db, transactional=True)
+                db.commit()
                 return
             if event.kind == "checkout.expired" and checkout.get("status") == "expired":
                 record.status = "expired" if isinstance(record, Order) else "cancelled"

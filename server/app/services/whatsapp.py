@@ -30,6 +30,7 @@ INSTANCE_NAME = "pholar-notifier"
 class NotificationEvent(str, Enum):
     NEW_ORDER = "new_order"
     NEW_BOOKING = "new_booking"
+    BOOKING_BALANCE_PAID = "booking_balance_paid"
     BOOKING_CANCELLED = "booking_cancelled"
     PAYMENT_FAILED = "payment_failed"
     NEW_CONTACT_MESSAGE = "new_contact_message"
@@ -40,6 +41,7 @@ class NotificationEvent(str, Enum):
 _TOGGLE_KEY: dict[NotificationEvent, str] = {
     NotificationEvent.NEW_ORDER: "notify_new_order",
     NotificationEvent.NEW_BOOKING: "notify_new_booking",
+    NotificationEvent.BOOKING_BALANCE_PAID: "notify_new_booking",
     NotificationEvent.BOOKING_CANCELLED: "notify_booking_cancelled",
     NotificationEvent.PAYMENT_FAILED: "notify_payment_failed",
     NotificationEvent.NEW_CONTACT_MESSAGE: "notify_new_contact_message",
@@ -53,6 +55,7 @@ _TOGGLE_KEY: dict[NotificationEvent, str] = {
 _DEFAULT_ON: dict[NotificationEvent, bool] = {
     NotificationEvent.NEW_ORDER: True,
     NotificationEvent.NEW_BOOKING: True,
+    NotificationEvent.BOOKING_BALANCE_PAID: True,
     NotificationEvent.BOOKING_CANCELLED: True,
     NotificationEvent.PAYMENT_FAILED: True,  # Phase 9: Stripe live — default flipped ON
     NotificationEvent.NEW_CONTACT_MESSAGE: True,

@@ -279,11 +279,12 @@ def merge_cart(body: MergeInput, customer: Customer = Depends(current), db: Sess
 
 @router.get("/history")
 def history(customer: Customer = Depends(current), db: Session = Depends(get_db)):
+    from app.services.booking_balance import summary
     if not customer.verified:
         raise HTTPException(403, "Verify your email to see your bookings and orders.")
     orders = db.query(Order).filter(func.lower(Order.customer_email) == customer.email).order_by(Order.created_at.desc()).limit(100).all()
     bookings = db.query(Booking).filter(func.lower(Booking.customer_email) == customer.email).order_by(Booking.booking_date.desc()).limit(100).all()
     return {
         "orders": [{"id": str(o.id), "reference": str(o.id)[:8].upper(), "date": o.created_at.isoformat(), "status": o.status, "total_cents": o.total_cents, "currency": o.currency, "url": f"/checkout/success?id={o.id}&token={customer_token('order', o.id)}"} for o in orders],
-        "bookings": [{"id": str(b.id), "service": b.service.name, "date": str(b.booking_date), "time": str(b.start_time)[:5], "status": b.status, "deposit_cents": b.deposit_cents, "url": f"/book/confirmation?id={b.id}&token={customer_token('booking', b.id)}"} for b in bookings],
+        "bookings": [{"id": str(b.id), "service": b.service_name_snapshot or b.service.name, "date": str(b.booking_date), "time": str(b.start_time)[:5], "status": b.status, "deposit_cents": b.deposit_cents, "currency": b.currency, **summary(b), "url": f"/book/confirmation?id={b.id}&token={customer_token('booking', b.id)}"} for b in bookings],
     }

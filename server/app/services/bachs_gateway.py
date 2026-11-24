@@ -66,9 +66,9 @@ class BachsGateway(PaymentGateway):
     def checkout_payload(self, amount_cents, metadata, customer_email, success_url, cancel_url, methods=None):
         if not isinstance(amount_cents, int) or amount_cents <= 0:
             raise BachsError("INVALID_AMOUNT")
-        kind = "order" if "order_id" in metadata else "booking"
-        record_id = metadata[kind+"_id"]
-        if settings.PAYMENT_SANDBOX_INSTANCE:
+        kind = "booking_balance" if "balance_id" in metadata else "order" if "order_id" in metadata else "booking"
+        record_id = metadata["balance_id" if kind == "booking_balance" else kind+"_id"]
+        if settings.PAYMENT_SANDBOX_INSTANCE and kind != "booking_balance":
             from app.core.security import customer_token
             params = urlencode({"kind": kind, "id": record_id, "token": customer_token(kind, record_id)})
             success_url = settings.DOMAIN.rstrip('/')+"/payment-sandbox?"+params
